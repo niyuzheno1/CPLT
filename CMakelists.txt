@@ -2,14 +2,19 @@ cmake_minimum_required (VERSION 3.21)
 project("hello")
 
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 
 set(TREE_SITTER_DLL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_dll/src")
 
 set(TREE_SITTER_EXE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_exe/src")
 
+
 file(GLOB TREE_SITTER_DLL_SOURCE_FILES
      "${TREE_SITTER_DLL_DIR}/*.cpp"
-)
+     "${TREE_SITTER_DLL_DIR}/*.h"
+     "${TREE_SITTER_DLL_DIR}/*.c"
+     )
 
 file(GLOB TREE_SITTER_EXE_SOURCE_FILES
      "${TREE_SITTER_EXE_DIR}/*.cpp"

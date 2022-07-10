@@ -1,8 +1,6 @@
-#include "tree_sitter_dll/header/pch.h"
-#include <iostream>
+#include "tree_sitter_dll\src\tree_sitter\api.h"
 using namespace std;
 
 int main(){
-    cout << add(1, 2) << endl;
     return 0;
 }
