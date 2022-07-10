@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.21)
-project("hello")
+project("cplt")
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -8,7 +8,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(TREE_SITTER_DLL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_dll/src")
 set(TREE_SITTER_EXE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_exe/src")
 set(TREE_SITTER_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_cplt/src")
-
+set(COMMON_HEADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/header")
 
 file(GLOB TREE_SITTER_DLL_SOURCE_FILES
      "${TREE_SITTER_DLL_DIR}/*.cpp"
@@ -24,6 +24,7 @@ file(GLOB TREE_SITTER_LIB_SOURCE_FILES
      "${TREE_SITTER_LIB_DIR}/*.cpp"
      "${TREE_SITTER_LIB_DIR}/*.h"
      "${TREE_SITTER_LIB_DIR}/*.c"
+     "${TREE_SITTER_LIB_DIR}/*.cc"
      )
 
 include(GenerateExportHeader)
@@ -35,6 +36,10 @@ add_library(tree_sitter_lib  ${TREE_SITTER_LIB_SOURCE_FILES})
 target_include_directories(tree_sitter_dll PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
 
 add_executable(tree_sitter_exe ${TREE_SITTER_EXE_SOURCE_FILES})
+target_include_directories(tree_sitter_dll PRIVATE ${COMMON_HEADER_DIR})
+target_include_directories(tree_sitter_lib PRIVATE ${COMMON_HEADER_DIR})
+target_include_directories(tree_sitter_exe PRIVATE ${COMMON_HEADER_DIR})
+
 target_link_libraries(tree_sitter_exe PRIVATE tree_sitter_dll)
 target_link_libraries(tree_sitter_exe PRIVATE tree_sitter_lib)
 

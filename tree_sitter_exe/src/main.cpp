@@ -1,4 +1,4 @@
-#include "tree_sitter_dll\src\tree_sitter\api.h"
+#include <tree_sitter\api.h>
 using namespace std;
 
 int main(){
