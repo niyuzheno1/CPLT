@@ -1,0 +1,1 @@
+msbuild hello.sln /p:Configuration=Debug /p:Platform=x64

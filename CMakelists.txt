@@ -1,0 +1,30 @@
+cmake_minimum_required (VERSION 3.21)
+project("hello")
+
+set(CMAKE_CXX_STANDARD 14)
+
+set(TREE_SITTER_DLL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_dll/src")
+
+set(TREE_SITTER_EXE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tree_sitter_exe/src")
+
+file(GLOB TREE_SITTER_DLL_SOURCE_FILES
+     "${TREE_SITTER_DLL_DIR}/*.cpp"
+)
+
+file(GLOB TREE_SITTER_EXE_SOURCE_FILES
+     "${TREE_SITTER_EXE_DIR}/*.cpp"
+)
+
+include(GenerateExportHeader)
+add_library(tree_sitter_dll SHARED  ${TREE_SITTER_DLL_SOURCE_FILES})
+generate_export_header(tree_sitter_dll)
+
+target_include_directories(tree_sitter_dll PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
+
+add_executable(tree_sitter_exe ${TREE_SITTER_EXE_SOURCE_FILES})
+target_link_libraries(tree_sitter_exe PRIVATE tree_sitter_dll)
+
+
+if(MSVC)
+    set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT tree_sitter_exe)
+endif()
