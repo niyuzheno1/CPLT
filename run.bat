@@ -1,1 +1,1 @@
-.\Debug\tree_sitter_exe.exe < input.txt 
+.\Debug\tree_sitter_exe.exe < input.txt > output.txt

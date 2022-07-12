@@ -1,3 +1,5 @@
 int main(){
-    return 0;
+    rep(i, j, k){
+        x = x + 1;
+    }
 }
