@@ -1,0 +1,1 @@
+.\Debug\tree_sitter_exe.exe < input.txt 

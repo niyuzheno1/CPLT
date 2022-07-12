@@ -22,3 +22,4 @@ del /s /q tree_sitter_exe.dir
 rmdir /s /q tree_sitter_exe.dir
 del /s /q tree_sitter_lib.dir
 rmdir /s /q tree_sitter_lib.dir
+del /s /q *.pdb
