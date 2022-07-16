@@ -1,1 +1,2 @@
-.\build_debug
+@echo off
+python build.py

@@ -782,7 +782,8 @@ module.exports = grammar({
         'rrep',
         'REP',
         'RREP',
-        'rep_dist'
+        'rep_dist',
+        'each'
       ),
       optional(seq('[', field('P0', $._expression) , ']')),
       '(',

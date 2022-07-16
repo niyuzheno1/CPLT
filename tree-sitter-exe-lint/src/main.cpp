@@ -9,30 +9,34 @@
 #include <algorithm>
 #include <set>
 #include <map>
+#include <assert.h>
 #include <clay.h>
 using namespace std;
 const int c_dbg = 0;
 // you can navigate using bread crumb
 
+str to_string(stringstream & x){
+    #undef str 
+    return x.str();
+    #define str string
+}
+
 namespace tree_sitter_util {
     template<typename T>
     set<T> toSet(vector<T> & t){
         set<T> s;
-        for(auto & i : t)
-            s.insert(i);
+        each(i, t) s.insert(i);
         return s;
     }
     template<typename T>
     set<T> mergeSet(set<T> & s1, set<T> & s2){
         set<T> s;
-        for(auto & i : s1)
-            s.insert(i);
-        for(auto & i : s2)
-            s.insert(i);
+        each(i, s1) s.insert(i);
+        each(i, s2) s.insert(i);
         return s;
     }
     template<typename T>
-    string toString(vector<T> & t){
+    str toString(vector<T> & t){
         stringstream ss;
         ss << "[";
         rep(i, 0, t.size()){
@@ -41,7 +45,8 @@ namespace tree_sitter_util {
                 ss << ", ";
         }
         ss << "]";
-        return ss.str();
+        //fix later
+        return to_string(ss);
     }
 }
 
@@ -50,12 +55,12 @@ using namespace tree_sitter_util;
 namespace tree_sitter_data_structures {
     class Scope{
     public:
-        string * buffer;
+        str * buffer;
         TSParser * tsParser;
         bool isInit;
         bool isTopLevel;
         int level = 0;
-        string getUnusedVariableName(){
+        str getUnusedVariableName(){
             // todo
             return "";
         }
@@ -65,15 +70,15 @@ namespace tree_sitter_data_structures {
     public:
         TemporaryBuffer() : _buffer(), _currentLine(), newline(true), firstchar(true) {}
 
-        string _buffer;
-        string _currentLine;
+        str _buffer;
+        str _currentLine;
         bool newline = true;
         bool firstchar = true;
-        void write(string & tmp, Scope & scope){
-            for(int i = 0; i < tmp.length(); ++i){
+        void write(str & tmp, Scope & scope){
+            rep(i, 0, tmp.length()){
                 // if tmp[i] is space
                 if(firstchar){
-                    _buffer += string(scope.level, '\t');
+                    _buffer += str(scope.level, '\t');
                     firstchar = false;
                 }
                 if(tmp[i] == ' ' || tmp[i] == '\t'){
@@ -91,8 +96,8 @@ namespace tree_sitter_data_structures {
                 }
             } 
         }
-        void writeMandatory(string & tmp, Scope & scope){
-            string ept = "\n";
+        void writeMandatory(str & tmp, Scope & scope){
+            str ept = "\n";
             write(ept, scope);
             _buffer += tmp;
             write(ept, scope);
@@ -100,7 +105,7 @@ namespace tree_sitter_data_structures {
         void show(){
             cout << _buffer<<endl;
         }
-        string getBuffer(){
+        str getBuffer(){
             if(_currentLine != ""){
                 _buffer += _currentLine;            
             }
@@ -125,7 +130,7 @@ namespace tree_sitter_simplified_proc {
     inline bool is_type(TSNode & x, const char * tp){
         return strcmp(tp, type(x)) == 0;
     }
-    inline bool is_type_of(TSNode & x, set<string> & tp){
+    inline bool is_type_of(TSNode & x, set<str> & tp){
         return tp.find(type(x)) != tp.end();
     }
 
@@ -140,10 +145,10 @@ namespace tree_sitter_simplified_proc {
 
 
     void getch(TSNode & x, function<void(TSNode)> y){
-    for(int i=0;i<cc(x);i++){
-        y(ch(x,i));
+        rep(i, 0, cc(x)){
+            y(ch(x,i));
+        }
     }
-}
     inline int start(TSNode & x) {
         return ts_node_start_byte(x);
     }
@@ -151,11 +156,11 @@ namespace tree_sitter_simplified_proc {
     inline int end(TSNode & x) {
         return ts_node_end_byte(x);
     }
-    string substring(Scope & scope, int st, int ed){
+    str substring(Scope & scope, int st, int ed){
         return scope.buffer->substr(st, ed-st);
     }
 
-    string substring(Scope & scope, TSNode x){
+    str substring(Scope & scope, TSNode x){
         return substring(scope, start(x), end(x));
     }
 }
@@ -168,16 +173,14 @@ extern "C" {
 }
 
 
-#define repb(i, x) getch(x, [&](TSNode i){ string p_content = substring(scope, x);
+#define repb(i, x) getch(x, [&](TSNode i){ str p_content = substring(scope, x);
 #define repe });
 
-string debug_buffer; // for c_dbg
-
-
+str debug_buffer; // for c_dbg
 
 
 void getParsedNode(TSNode & root /*Out*/, Scope & scope /*In*/ ){
-    string& buffer = *scope.buffer;
+    str & buffer = *scope.buffer;
     TSParser * tsParser = scope.tsParser;
     TSTree * tree = ts_parser_parse_string(
         tsParser,
@@ -206,12 +209,10 @@ public:
 
 class statement_handler{
 public:
-    void registerHandler(vector<string> & x){
-        for(auto i : x){
-            statement_handlers[i] = this;
-        }
+    void registerHandler(vs & x){
+        each(i, x) statement_handlers[i] = this;
     }
-    virtual vector<string> getAllTypes() = 0;
+    virtual vs getAllTypes() = 0;
     virtual void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) = 0;
 };
 
@@ -220,7 +221,7 @@ public:
     compound_statement(){
         this->registerHandler(getAllTypes());
     }
-    vector<string> getAllTypes() override{
+    vs getAllTypes() override{
         return {"compound_statement", "declaration_list", "field_declaration_list"};
     }
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
@@ -239,25 +240,93 @@ public:
 
 }compound_like_statement_handler;
 
+class type_identifier : public statement_handler{
+public:
+    type_identifier(){
+        replacingTypes["ll"] = "long long";
+        replacingTypes["ull"] = "unsigned long long";
+        replacingTypes["db"] = "long double";
+        replacingTypes["str"] = "string";
+        replacingTypes["i64"] = "long long";
+        replacingTypes["u64"] = "unsigned long long";
+        replacingTypes["i32"] = "int";
+        replacingTypes["u32"] = "unsigned int";
+        replacingTypes["vi"] = "vector<int>";
+        replacingTypes["vb"] = "vector<bool>";
+        replacingTypes["vl"] = "vector<long long>";
+        replacingTypes["vd"] = "vector<long double>";
+        replacingTypes["vs"] = "vector<string>";
+        replacingTypes["vpi"] = "vector<pair<int, int>>";
+        replacingTypes["vpl"] = "vector<pair<long long, long long>>";
+        replacingTypes["vpd"] = "vector<pair<long double, long double>>";
+        this->registerHandler(getAllTypes());
+    }
+    vs getAllTypes() override{
+        return {"type_identifier"};
+    }
+    map<str, str> replacingTypes;
+
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        int curp = start(node);
+        str text = substring(scope, node);
+        assert(cc(node) == 0);
+        if(replacingTypes.count(text)){
+            retVal.tb.write(replacingTypes[text], scope);
+        }else{
+            int vcnt = -1;
+            rep(i, 0, text.size()){
+                if(text[i] == 'v'){
+                    ++vcnt;
+                }else{
+                    break;
+                }
+            }
+            //get substring after vcnt to end of text
+            
+            if(vcnt >= 0){
+                str sub = text.substr(vcnt);
+                if(sub.size() > 0){
+                    if(sub[0] == 'v' && replacingTypes.count(sub)){
+                        stringstream ss;
+                        //add vector before 
+                        rep(j, 0, vcnt){
+                            ss << "vector<";
+                        }
+                        ss << replacingTypes[sub];
+                        //add vector after
+                        rep(j, 0, vcnt){
+                            ss << ">";
+                        }
+                        retVal.tb.write(to_string(ss), scope);
+                        return;
+                    }
+                }
+            }
+            retVal.tb.write( text , scope);
+        }
+    }
+
+}type_identifier_handler;
+
 class repeat_statement : public statement_handler{
 public:
     repeat_statement(){
         this->registerHandler(getAllTypes());
     }
-    vector<string> getAllTypes() override{
+    vs getAllTypes() override{
         return {"repeat_statement"};
     }
-    vector<string> getRepeatKeyTypes(){
-        return {  "rep_perm", "rep_scomb",  "rep_mcomb",  "rep_sarr", "rep_marr",  "rep", "rrep",  "REP",  "RREP", "rep_dist" };
+    vs getRepeatKeyTypes(){
+        return {  "rep_perm", "rep_scomb",  "rep_mcomb",  "rep_sarr", "rep_marr",  "rep", "rrep",  "REP",  "RREP", "rep_dist", "each" };
     }
-    vector<string> getImportantToken(){
+    vs getImportantToken(){
         return {"(", ")", "[", "]", ","};
     }
 
-    void handleTemplate(string & head, 
-                        string  & templateFormulation,
-                        vector<string> & positionArgs,
-                        string & body,
+    void handleTemplate(str & head, 
+                        str  & templateFormulation,
+                        vs & positionArgs,
+                        str & body,
                         Scope & scope,
                         ReturnValue & retVal){
     scope.level ++;
@@ -267,7 +336,7 @@ public:
     // todo if positionArgs[0] is already within the scope
     if(head == "rep" && templateFormulation == "()"){
         // todo if we have get unused variable name from scope
-        string unusedName = scope.getUnusedVariableName();
+        str unusedName = scope.getUnusedVariableName();
         ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
     }
     if(head == "rep" && templateFormulation == "(,)"){
@@ -279,11 +348,10 @@ public:
     if (head == "rep" &&  templateFormulation == "(,,,)"){
         ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
     }
-
-    
-
-    retVal.tb.write(ss.str(), scope);
-     
+    if(head == "each" && templateFormulation == "(,)"){
+        ss << "for(auto & " << positionArgs[0] << " : " << positionArgs[1] << ")";
+    }
+    retVal.tb.write(to_string(ss), scope);
     // process the body if we keep the body intact
     retVal.tb.writeMandatory(body, scope);
     
@@ -293,13 +361,13 @@ public:
 
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
         int curp = start(node);
-        set<string> importantTypes = toSet(getImportantToken());
-        set<string> originatorTypes = toSet(getRepeatKeyTypes());
-        string templateFormulation = "";
-        string head = "";
-        vector<string> positionArgs;
+        set<str> importantTypes = toSet(getImportantToken());
+        set<str> originatorTypes = toSet(getRepeatKeyTypes());
+        str templateFormulation = "";
+        str head = "";
+        vs positionArgs;
         bool encountered = false;
-        string rest;
+        str rest;
         repb(child, node)   
             if(is_type(child, ")")) encountered = true;
             if(is_type_of(child, importantTypes)){
@@ -327,10 +395,10 @@ public:
                 rest = tmp.tb.getBuffer();
             }
         repe
-        if(c_dbg){
-            debug_buffer += "repeat_statemen=" + head + ":" + templateFormulation + "\n";
-            debug_buffer += "arguments=" + toString(positionArgs) + "\n";
-        } 
+        // if(c_dbg){
+        //     debug_buffer += "repeat_statemen=" + head + ":" + templateFormulation + "\n";
+        //     debug_buffer += "arguments=" + toString(positionArgs) + "\n";
+        // } 
         handleTemplate(head, templateFormulation, positionArgs, rest, scope, retVal);
         if(curp != end(node)){
             retVal.tb.write( substring(scope, curp, end(node)) , scope);
@@ -338,15 +406,15 @@ public:
     }
 }repeat_statement_handler;
 
-map<string, string> allKInds;
+map<str, str> allKinds;
 void parse(TSNode & node, Scope & scope, ReturnValue & retval){
-    string nodeType = type(node);
-    string content = substring(scope, start(node), end(node));
+    str nodeType = type(node);
+    str content = substring(scope, start(node), end(node));
     if(statement_handlers.count(nodeType) != 0){
         statement_handlers[nodeType]->handle(node, scope, retval, parse);
         return;
     }
-    if(c_dbg){ allKInds[nodeType] = content;} 
+    if(c_dbg){ allKinds[nodeType] = content;} 
     int curp = start(node);
     repb(child, node)
         retval.tb.write(substring(scope, curp, start(child)), scope);
@@ -361,10 +429,10 @@ void parse(TSNode & node, Scope & scope, ReturnValue & retval){
 
 
 int main(){
-    string buffer;
+    str buffer;
     //get from iostream 
     while(!cin.eof()){
-        string tmp = "";    
+        str tmp = "";    
         getline(cin, tmp);
         buffer += tmp + "\n";
     }
@@ -381,7 +449,7 @@ int main(){
     retval.tb.show();
     //print all kinds
     if(c_dbg){
-        for(auto & x : allKInds){
+        each(x, allKinds){
             debug_buffer += "node type:"+ x.first + "\n";
             debug_buffer += x.second + "\n";
             debug_buffer += "\n";

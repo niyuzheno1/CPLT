@@ -6996,6 +6996,10 @@
     "named": false
   },
   {
+    "type": "each",
+    "named": false
+  },
+  {
     "type": "else",
     "named": false
   },
