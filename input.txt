@@ -1,4 +1,10 @@
 int main(){
+    rep(i){
+        i = 0;
+    }
+    rep(i, j){
+        i = i + j;
+    }
     rep(i, j, k){
         x = x + 1;
     }

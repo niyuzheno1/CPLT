@@ -1,12 +1,28 @@
 int main(){
-
-	for(int i = (j); i < (k); i++)
-	{
-		x = x + 1;
-	}	
+	
+		for(int  = (0);  < (i); ++)
+		{
+			i = 0;
+		}		
+	
+	
+		for(int i = (0); i < (j); i++)
+		{
+			i = i + j;
+		}		
+	
+	
+		for(int i = (j); i < (k); i++)
+		{
+			x = x + 1;
+		}		
 
 }
 
+repeat_statemen=rep:()
+arguments=[i]
+repeat_statemen=rep:(,)
+arguments=[i, j]
 repeat_statemen=rep:(,,)
 arguments=[i, j, k]
 node type:(
@@ -30,35 +46,27 @@ x = x + 1
 node type:binary_expression
 x + 1
 
-node type:declaration
-int main(){
-    rep(i, j, k){
-        x = x + 1;
-    }
-}
-
 node type:expression_statement
 x = x + 1;
 
 node type:function_declarator
 main()
 
+node type:function_definition
+int main(){
+    rep(i){
+        i = 0;
+    }
+    rep(i, j){
+        i = i + j;
+    }
+    rep(i, j, k){
+        x = x + 1;
+    }
+}
+
 node type:identifier
 x
-
-node type:init_declarator
-main(){
-    rep(i, j, k){
-        x = x + 1;
-    }
-}
-
-node type:initializer_list
-{
-    rep(i, j, k){
-        x = x + 1;
-    }
-}
 
 node type:number_literal
 1
@@ -71,6 +79,12 @@ int
 
 node type:translation_unit
 int main(){
+    rep(i){
+        i = 0;
+    }
+    rep(i, j){
+        i = i + j;
+    }
     rep(i, j, k){
         x = x + 1;
     }

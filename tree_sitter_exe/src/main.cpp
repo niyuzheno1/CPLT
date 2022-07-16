@@ -54,6 +54,10 @@ namespace tree_sitter_data_structures {
         bool isInit;
         bool isTopLevel;
         int level = 0;
+        string getUnusedVariableName(){
+            // todo
+            return "";
+        }
     };
 
     class TemporaryBuffer{
@@ -259,11 +263,23 @@ public:
     // process the head
     stringstream ss;
     ss << endl;
-    if(head == "rep" && templateFormulation == "(,,)"){
-        
-        // todo if positionArgs[0] is already within the scope
+    // todo if positionArgs[0] is already within the scope
+    if(head == "rep" && templateFormulation == "()"){
+        // todo if we have get unused variable name from scope
+        string unusedName = scope.getUnusedVariableName();
+        ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
+    }
+    if(head == "rep" && templateFormulation == "(,)"){
+        ss << "for(int " << positionArgs[0] << " = ("<<0 << "); "<< positionArgs[0] << " < (" <<  positionArgs[1] << "); "<< positionArgs[0] <<"++)";
+    }
+    if(head == "rep" && templateFormulation == "(,,)"){    
         ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"++)";
     }
+    if (head == "rep" &&  templateFormulation == "(,,,)"){
+        ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
+    }
+
+    
 
     retVal.tb.write(ss.str(), scope);
      
