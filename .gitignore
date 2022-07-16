@@ -51,3 +51,5 @@ Release
 
 .vscode
 *.pdb
+
+*.txt
