@@ -19,8 +19,6 @@ const int c_dbg = 0;
 #endif
 // you can navigate using bread crumb
 
-
-
 namespace tree_sitter_memory_management{
     class MemoryManager{
     public:
@@ -60,11 +58,13 @@ namespace tree_sitter_declaration_space {
         } 
         void add(data_type * d){
             sq.pb(d);
+            isSequential = true;
         }
         void addAll(const Seq & s){
             each(d, s){
                 sq.pb(d);
             }
+            isSequential = true;
         }
         void show(){
             cout << content ;
@@ -77,6 +77,23 @@ namespace tree_sitter_declaration_space {
         }
         size_t size(){
             return sq.size();
+        }
+        bool isString(){
+            if(size() == 0){
+                return true;
+            }
+            if(size() == 1 && sq[0]->size() == 1 && !sq[0]->isSequential){
+                return true;
+            }
+            return false;
+        }
+        str toString(){
+            str ret = "";
+            ret += content;
+            rep(i, 0, sz(*this)){
+                ret += sq[i]->toString();
+            }
+            return ret;
         }
     };
     class DataTypeStream{
@@ -222,41 +239,80 @@ namespace tree_sitter_simplified_proc {
         return substring(scope, start(x), end(x));
     }
 
-    vs Explode(str s, str delim){
-        vs ret;
+    // vs Explode(str s, str delim){
+    //     vs ret;
+    //     int curp = 0;
+    //     int nextp = 0;
+    //     while(nextp != -1){
+    //         nextp = s.find(delim, curp);
+    //         if(nextp != -1){
+    //             ret.pb(s.substr(curp, nextp - curp));
+    //             curp = nextp + sz(delim);
+    //         }else{
+    //             ret.pb(s.substr(curp));
+    //         }
+    //     }
+    //     return ret;
+    // }
+    Seq Explode(const str & x, str delim){
+        Seq ret;
         int curp = 0;
         int nextp = 0;
         while(nextp != -1){
-            nextp = s.find(delim, curp);
+            nextp = x.find(delim, curp);
             if(nextp != -1){
-                ret.pb(s.substr(curp, nextp - curp));
+                data_type * tp = data_type::newInstance();
+                tp->content = x.substr(curp, nextp - curp);
+                ret.pb(tp);
                 curp = nextp + sz(delim);
             }else{
-                ret.pb(s.substr(curp));
+                data_type * tp = data_type::newInstance();
+                tp->content = x.substr(curp);
+                ret.pb(tp);
             }
         }
         return ret;
     }
-    str Implode(vs s, str delim){
-        str ret;
-        rep(i, 0, sz(s)){
-            if(i != 0){
-                ret += delim;
+    Seq Explode(Seq& st, str delim){
+        Seq ret;
+        rep(i, 0, sz(st)){
+            if(st[i]->type == "" && st[i]->isString()){
+                Seq ss = Explode(st[i]->toString(), delim);
+                ret.ins(ret.end(), ss.begin(), ss.end());
+            }else{
+                ret.pb(st[i]);
             }
-            ret += s[i];
         }
         return ret;
     }
 
-    data_type * Implode(vs s, data_type* delim){
-        data_type * dt = new data_type();
-        rep(i, 0, sz(s)){
-            addp( s[i]);
-            if(i + 1 != sz(s)){
-                dt->add(delim);
+    Seq replace(Seq & st, str delim, data_type * end){
+        Seq ret;
+        rep(i, 0, sz(st)){
+            if(st[i]->type == "" && st[i]->isString()){
+                Seq ss = Explode(st[i]->toString(), delim);
+                rep(j, 0, sz(ss)){
+                    ret.pb(ss[j]);
+                    if(j+1 != sz(ss)){
+                        ret.pb(end);
+                    }
+                }
+            }else{
+                ret.pb(st[i]);
             }
         }
-        return dt;
+        return ret;
+    }
+
+    Seq Implode(const Seq & s, data_type* delim){
+        Seq ret; 
+        rep(i, 0, sz(s)){
+            ret.pb(s[i]);
+            if(i + 1 != sz(s)){
+                ret.pb(delim);
+            }
+        }
+        return ret;
     }
 }
 using namespace  tree_sitter_simplified_proc;
@@ -293,28 +349,18 @@ namespace tree_sitter_debug_namespace {
     }
 };
 
-
-
 using namespace tree_sitter_debug_namespace;
-
-
 
 extern "C" {
      TSLanguage* tree_sitter_cpp();
 }
 
 
-
 #define repb(i, x) getch(x, [&](TSNode i){ str p_content = substring(scope, x);
 #define repe });
 
 
-
-
-
 debugString debug_buffer; // for c_dbg
-
-
 
 
 //function prototype void parse(TSNode & node, Scope & scope, ReturnValue & retval)
@@ -451,7 +497,6 @@ public:
                     break;
                 }
             }
-            //get substring after vcnt to end of text
             
             if(vcnt >= 0){
                 str sub = text.substr(vcnt);
@@ -529,19 +574,50 @@ public:
     call_expression(){
         this->registerHandler(getAllTypes());
         replacingTypes["mp"] = "make_pair";
-        replacingFieldTypes["sz"] = "(int)(args.size())";
+        replacingFieldTypes["sz"] = "(int)((${0}).size())";
         replacingTypes["bg"] = "begin";
         replacingTypes["ed"] = "end";
         replacingTypes["pct"] = "__builtin_popcount";
-        replacingFieldTypes["all"] = "begin(args), end(args)";
-        replacingFieldTypes["rall"] = "rbegin(args), rend(args)";
-        replacingFieldTypes["bits"] = "(args == 0 ? 0 : 31-__builtin_clz(args))";
-        replacingFieldTypes["p2"] = "(1<<(args))";
-        replacingFieldTypes["msk2"] = "((1<<(args))-1)";
+        replacingFieldTypes["all"] = "begin(${0}), end(${0})";
+        replacingFieldTypes["rall"] = "rbegin(${0}), rend(${0})";
+        replacingFieldTypes["bits"] = "(${0} == 0 ? 0 : 31-__builtin_clz(${0}))";
+        replacingFieldTypes["p2"] = "(1<<(${0}))";
+        replacingFieldTypes["msk2"] = "((1<<(${0}))-1)";
+    }
+    //get maximum ${x} x's value
+    int getMaxArgumentValue(str & x){
+        int ret = 0;
+        rep(i, 0, sz(x)){
+            if(x[i] == '$'){
+                if(i + 1 < sz(x) && x[i+1] == '{'){
+                    bool hit = false;
+                    str tmp = "";
+                    rep(j, i+2, sz(x)){
+                        if(x[j] == '}'){
+                            hit = true;
+                            break;
+                        }
+                        tmp += x[j];
+                    }
+                    if(hit && numberOnly(tmp)){
+                        ret = max((ll)ret, stoll(tmp)); // TODO: we can use chmax here
+                    }
+                }
+            }
+        }
+        return ret+1;
+    }
+    bool numberOnly(const str & x){
+        rep(i, 0, sz(x)){
+            if(!isdigit(x[i])){
+                return false;
+            }
+        }
+        return true;
     }
 
     data_type* toFun(str functionName, data_type* _args){
-        string x = replacingFieldTypes[functionName];
+        str x = replacingFieldTypes[functionName];
         data_type * args = (*_args)[0];
         Seq sq; 
         rep(i, 0, sz(*args)){
@@ -552,8 +628,22 @@ public:
             if(cur->type == ",") continue;
             sq.push_back(cur);
         }
+        int mx = getMaxArgumentValue(x);
+        Seq cur;
+        data_type * rxt = data_type::newInstance();
+        rxt->content = x;
+        cur.push_back(rxt);
+        assert(mx == sz(sq));
+        rep(i, 0 , mx){
+            str deliminator = "${" + to_string(i) + "}";
+            cur = replace(cur, deliminator, sq[i]);
+            //cur = Implode(Explode(cur, deliminator), sq[i]);
+        }
+        
         // replace "args" with args 
-        return Implode(Explode(x, "args"), sq[0]);
+        data_type * ret = data_type::newInstance();
+        ret->addAll(cur);
+        return ret;
     }
 
     map<str, str> replacingTypes;
@@ -566,10 +656,10 @@ public:
         int curp = start(node);
         bool sentenced = false;
         ReturnValue tmp;
-        string funName = "";
+        str funName = "";
         data_type * tdt = data_type::newInstance();
         repb(child, node)
-            string ctext = substring(scope, child);   
+            str ctext = substring(scope, child);   
             if(is_type(child, "identifier")){
                 if(replacingFieldTypes.count(ctext)){
                     funName = ctext;
@@ -592,7 +682,7 @@ public:
         }
         curp = start(node);
         repb(child, node)
-            string ctext = substring(scope, child);   
+            str ctext = substring(scope, child);   
             addp(substring(scope, curp, start(child)));
             if(is_type(child, "identifier")){
                 if(replacingTypes.count(ctext)){
@@ -629,7 +719,7 @@ public:
     map<str, str> replacingTypes;
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
         prel(node, retVal);
-        string text = substring(scope, node);
+        str text = substring(scope, node);
         assert(cc(node) == 0);
         if(replacingTypes.count(text)){
             addp(replacingTypes[text]);

@@ -60,11 +60,13 @@ namespace tree_sitter_declaration_space {
         } 
         void add(data_type * d){
             sq.push_back(d);
+            isSequential = true;
         }
         void addAll(const Seq & s){
             for(auto & d : s){
                 sq.push_back(d);
             }
+            isSequential = true;
         }
         void show(){
             cout << content ;
@@ -77,6 +79,23 @@ namespace tree_sitter_declaration_space {
         }
         size_t size(){
             return sq.size();
+        }
+        bool isString(){
+            if(size() == 0){
+                return true;
+            }
+            if(size() == 1 && sq[0]->size() == 1 && !sq[0]->isSequential){
+                return true;
+            }
+            return false;
+        }
+        string toString(){
+            string ret = "";
+            ret += content;
+            for(int i = (0); i < ((int)((*this).size())); i++){
+                ret += sq[i]->toString();
+            }
+            return ret;
         }
     };
     class DataTypeStream{
@@ -222,41 +241,80 @@ namespace tree_sitter_simplified_proc {
         return substring(scope, start(x), end(x));
     }
 
-    vector<string> Explode(string s, string delim){
-        vector<string> ret;
+    // vs Explode(str s, str delim){
+    //     vs ret;
+    //     int curp = 0;
+    //     int nextp = 0;
+    //     while(nextp != -1){
+    //         nextp = s.find(delim, curp);
+    //         if(nextp != -1){
+    //             ret.pb(s.substr(curp, nextp - curp));
+    //             curp = nextp + sz(delim);
+    //         }else{
+    //             ret.pb(s.substr(curp));
+    //         }
+    //     }
+    //     return ret;
+    // }
+    Seq Explode(const string & x, string delim){
+        Seq ret;
         int curp = 0;
         int nextp = 0;
         while(nextp != -1){
-            nextp = s.find(delim, curp);
+            nextp = x.find(delim, curp);
             if(nextp != -1){
-                ret.push_back(s.substr(curp, nextp - curp));
+                data_type * tp = data_type::newInstance();
+                tp->content = x.substr(curp, nextp - curp);
+                ret.push_back(tp);
                 curp = nextp + (int)((delim).size());
             }else{
-                ret.push_back(s.substr(curp));
+                data_type * tp = data_type::newInstance();
+                tp->content = x.substr(curp);
+                ret.push_back(tp);
             }
         }
         return ret;
     }
-    string Implode(vector<string> s, string delim){
-        string ret;
-        for(int i = (0); i < ((int)((s).size())); i++){
-            if(i != 0){
-                ret += delim;
+    Seq Explode(Seq& st, string delim){
+        Seq ret;
+        for(int i = (0); i < ((int)((st).size())); i++){
+            if(st[i]->type == "" && st[i]->isString()){
+                Seq ss = Explode(st[i]->toString(), delim);
+                ret.insert(ret.end(), ss.begin(), ss.end());
+            }else{
+                ret.push_back(st[i]);
             }
-            ret += s[i];
         }
         return ret;
     }
 
-    data_type * Implode(vector<string> s, data_type* delim){
-        data_type * dt = new data_type();
-        for(int i = (0); i < ((int)((s).size())); i++){
-            addp( s[i]);
-            if(i + 1 != (int)((s).size())){
-                dt->add(delim);
+    Seq replace(Seq & st, string delim, data_type * end){
+        Seq ret;
+        for(int i = (0); i < ((int)((st).size())); i++){
+            if(st[i]->type == "" && st[i]->isString()){
+                Seq ss = Explode(st[i]->toString(), delim);
+                for(int j = (0); j < ((int)((ss).size())); j++){
+                    ret.push_back(ss[j]);
+                    if(j+1 != (int)((ss).size())){
+                        ret.push_back(end);
+                    }
+                }
+            }else{
+                ret.push_back(st[i]);
             }
         }
-        return dt;
+        return ret;
+    }
+
+    Seq Implode(const Seq & s, data_type* delim){
+        Seq ret; 
+        for(int i = (0); i < ((int)((s).size())); i++){
+            ret.push_back(s[i]);
+            if(i + 1 != (int)((s).size())){
+                ret.push_back(delim);
+            }
+        }
+        return ret;
     }
 }
 using namespace  tree_sitter_simplified_proc;
@@ -529,15 +587,46 @@ public:
     call_expression(){
         this->registerHandler(getAllTypes());
         replacingTypes["mp"] = "make_pair";
-        replacingFieldTypes["sz"] = "(int)(args.size())";
+        replacingFieldTypes["sz"] = "(int)((${0}).size())";
         replacingTypes["bg"] = "begin";
         replacingTypes["ed"] = "end";
         replacingTypes["pct"] = "__builtin_popcount";
-        replacingFieldTypes["all"] = "begin(args), end(args)";
-        replacingFieldTypes["rall"] = "rbegin(args), rend(args)";
-        replacingFieldTypes["bits"] = "(args == 0 ? 0 : 31-__builtin_clz(args))";
-        replacingFieldTypes["p2"] = "(1<<(args))";
-        replacingFieldTypes["msk2"] = "((1<<(args))-1)";
+        replacingFieldTypes["all"] = "begin(${0}), end(${0})";
+        replacingFieldTypes["rall"] = "rbegin(${0}), rend(${0})";
+        replacingFieldTypes["bits"] = "(${0} == 0 ? 0 : 31-__builtin_clz(${0}))";
+        replacingFieldTypes["p2"] = "(1<<(${0}))";
+        replacingFieldTypes["msk2"] = "((1<<(${0}))-1)";
+    }
+    //get maximum ${x} x's value
+    int getMaxArgumentValue(string & x){
+        int ret = 0;
+        for(int i = (0); i < ((int)((x).size())); i++){
+            if(x[i] == '$'){
+                if(i + 1 < (int)((x).size()) && x[i+1] == '{'){
+                    bool hit = false;
+                    string tmp = "";
+                    for(int j = (i+2); j < ((int)((x).size())); j++){
+                        if(x[j] == '}'){
+                            hit = true;
+                            break;
+                        }
+                        tmp += x[j];
+                    }
+                    if(hit && numberOnly(tmp)){
+                        ret = max((long long)ret, stoll(tmp)); // TODO: we can use chmax here
+                    }
+                }
+            }
+        }
+        return ret+1;
+    }
+    bool numberOnly(const string & x){
+        for(int i = (0); i < ((int)((x).size())); i++){
+            if(!isdigit(x[i])){
+                return false;
+            }
+        }
+        return true;
     }
 
     data_type* toFun(string functionName, data_type* _args){
@@ -552,8 +641,22 @@ public:
             if(cur->type == ",") continue;
             sq.push_back(cur);
         }
+        int mx = getMaxArgumentValue(x);
+        Seq cur;
+        data_type * rxt = data_type::newInstance();
+        rxt->content = x;
+        cur.push_back(rxt);
+        assert(mx == (int)((sq).size()));
+        for(int i = (0); i < (mx); i++){
+            string deliminator = "${" + to_string(i) + "}";
+            cur = replace(cur, deliminator, sq[i]);
+            //cur = Implode(Explode(cur, deliminator), sq[i]);
+        }
+        
         // replace "args" with args 
-        return Implode(Explode(x, "args"), sq[0]);
+        data_type * ret = data_type::newInstance();
+        ret->addAll(cur);
+        return ret;
     }
 
     map<string, string> replacingTypes;
