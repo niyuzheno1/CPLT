@@ -481,7 +481,8 @@ public:
         if(replacingTypes.count(text)){
             Scope nScope;
             nScope.copyParser(scope);
-            nScope.buffer = &replacingTypes[text];
+            string tmps = replacingTypes[text] + " x;";
+            nScope.buffer = &tmps;
             TSNode nRoot = nScope.getParsedNode();
             ReturnValue nRetVal;
             parse(nRoot, nScope, nRetVal); 
@@ -756,19 +757,36 @@ public:
         // process the head
         DataTypeStream ss;
         // todo if positionArgs[0] is already within the scope
-        if(head == "rep" && templateFormulation == "()"){
+        bool repType = (head == "rep" || head == "rrep");
+        if(repType && templateFormulation == "()"){
             // todo if we have get unused variable name from scope
             str unusedName = scope.getUnusedVariableName();
-            ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
+            if(head == "rep"){
+                ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
+            }else if(head == "rrep"){
+                ss << "for(int " << unusedName << " = (("<<positionArgs[0] << ")-1); "<<  unusedName << " >= (0); "<< unusedName <<"--)";
+            }
         }
-        if(head == "rep" && templateFormulation == "(,)"){
-            ss << "for(int " << positionArgs[0] << " = ("<<0 << "); "<< positionArgs[0] << " < (" <<  positionArgs[1] << "); "<< positionArgs[0] <<"++)";
+        if(repType && templateFormulation == "(,)"){
+            if(head == "rep"){
+                ss << "for(int " << positionArgs[0] << " = ("<<0 << "); "<< positionArgs[0] << " < (" <<  positionArgs[1] << "); "<< positionArgs[0] <<"++)";
+            }else if(head == "rrep"){
+                ss << "for(int " << positionArgs[0] << " = (("<< positionArgs[1]  << ")-1); "<< positionArgs[0] << " >= 0; "<< positionArgs[0] <<"--)";
+            }
         }
-        if(head == "rep" && templateFormulation == "(,,)"){    
-            ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"++)";
+        if(repType && templateFormulation == "(,,)"){
+            if(head == "rep"){
+                ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"++)";
+            }else if(head == "rrep"){
+                ss << "for(int " << positionArgs[0] << " = (("<< positionArgs[2] << ")-1); "<< positionArgs[0] << " >= (" << positionArgs[1] << "); "<< positionArgs[0] <<"--)";
+            }    
         }
-        if (head == "rep" &&  templateFormulation == "(,,,)"){
-            ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
+        if (repType &&  templateFormulation == "(,,,)"){
+            if(head == "rep"){
+                ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
+            }else if(head == "rrep"){
+                ss << "for(int " << positionArgs[0] << " = (("<< positionArgs[2] << ")-1); "<< positionArgs[0] << " >= (" << positionArgs[1] << "); "<< positionArgs[0] <<"-= (" << positionArgs[3] << "))";
+            }
         }
         if(head == "each" && templateFormulation == "(,)"){
             ss << "for(auto & " << positionArgs[0] << " : " << positionArgs[1] << ")";

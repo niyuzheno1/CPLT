@@ -23,3 +23,4 @@ using u32 = unsigned int;
 #define eb emplace_back
 #define ft front()
 #define bk back()
+#define rrep(x, y, z) for (int x = (y); x >= (z); x--)
