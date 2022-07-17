@@ -4566,6 +4566,10 @@
             {
               "type": "SYMBOL",
               "name": "goto_statement"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "repeat_statement"
             }
           ]
         },
@@ -5211,10 +5215,6 @@
             {
               "type": "SYMBOL",
               "name": "range_result_statement"
-            },
-            {
-              "type": "SYMBOL",
-              "name": "repeat_statement"
             },
             {
               "type": "SYMBOL",

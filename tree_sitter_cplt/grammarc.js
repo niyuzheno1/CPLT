@@ -634,7 +634,8 @@ module.exports = grammar({
       $.return_statement,
       $.break_statement,
       $.continue_statement,
-      $.goto_statement
+      $.goto_statement,
+      $.repeat_statement,
     ),
 
     labeled_statement: $ => seq(
@@ -759,7 +760,6 @@ module.exports = grammar({
       $.range_expression,
       $.search_statement,
       $.range_result_statement,
-      $.repeat_statement,
       $.binary_search_expression,
     ),
     template_automation_expression: $ => seq(

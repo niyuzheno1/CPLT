@@ -204,10 +204,6 @@
         "named": true
       },
       {
-        "type": "repeat_statement",
-        "named": true
-      },
-      {
         "type": "requires_clause",
         "named": true
       },
@@ -357,6 +353,10 @@
       },
       {
         "type": "labeled_statement",
+        "named": true
+      },
+      {
+        "type": "repeat_statement",
         "named": true
       },
       {
@@ -1349,6 +1349,10 @@
         },
         {
           "type": "labeled_statement",
+          "named": true
+        },
+        {
+          "type": "repeat_statement",
           "named": true
         },
         {

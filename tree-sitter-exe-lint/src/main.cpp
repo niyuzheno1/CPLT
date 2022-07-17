@@ -43,13 +43,18 @@ namespace tree_sitter_declaration_space {
     using Seq = vector<data_type*>;
     class data_type{
     public:
+        data_type * parent;
         data_type(){
+            parent = nullptr;
             type = "";
             sq = Seq();
             isSequential = false; 
             content = "";
         }
         str type; 
+        virtual str getBaseType(){
+            return "";
+        }
         Seq sq;
         bool isSequential;
         str content; 
@@ -58,11 +63,18 @@ namespace tree_sitter_declaration_space {
         } 
         void add(data_type * d){
             sq.pb(d);
+            if(d != nullptr){
+                d->parent = this;
+            }
             isSequential = true;
+        }
+        void push_back(data_type * d){
+            add(d);
         }
         void addAll(const Seq & s){
             each(d, s){
                 sq.pb(d);
+                if(d != nullptr) d->parent = this;
             }
             isSequential = true;
         }
@@ -96,6 +108,91 @@ namespace tree_sitter_declaration_space {
             return ret;
         }
     };
+    using vpdtpdt = vector<pair<data_type*, data_type*>>;
+
+    class function_definition_data_type : public data_type{
+    public:
+        vpdtpdt usages;
+        function_definition_data_type(){
+            data_type();
+            usages = vpdtpdt();
+            type = "function_definition";
+        }
+        str getBaseType() override{
+            return "function_definition";
+        }
+        static function_definition_data_type * newInstance(){
+            return memoryManager.newInstance<function_definition_data_type>();
+        }
+    };
+
+    class parameter_list_data_type : public data_type{
+    public:
+        parameter_list_data_type(){
+            data_type();
+            type = "parameter_list";
+            sq = Seq();
+            isSequential = false; 
+            content = "";
+        }
+        str getBaseType() override{
+            return "parameter_list";
+        }
+        int getArgsCount(){
+            int cnt = 0;
+            int flag = 0;
+            each(x, sq){
+                if(x->type == "(") flag = 1;
+                if(x->type == ")") flag = 0;
+                if(x->type != "" && x->type != "," && x->type != "(" && flag == 1){
+                    cnt++;
+                }
+            }
+            return cnt;
+        }
+        static parameter_list_data_type * newInstance(){
+            return memoryManager.newInstance<parameter_list_data_type>();
+        }
+    };  
+
+   
+    class function_declarator_data_type : public data_type{
+    public:
+        function_declarator_data_type(){
+            data_type();
+            name = "";
+            args = 0;
+            type = "function_declarator";
+            sq = Seq();
+            isSequential = false; 
+            content = "";
+        }
+        str getBaseType() override{
+            return "function_declarator";
+        }
+        static function_declarator_data_type * newInstance(){
+            return memoryManager.newInstance<function_declarator_data_type>();
+        }
+        string name;
+        int args = 0;
+    };
+
+    pair<str,int> getFunctionDeclaration(data_type * dt){
+        if(dt->getBaseType() != "function_declarator"){
+            each(y, dt->sq){
+                auto ret = getFunctionDeclaration(y);
+                if(ret.s != -1){
+                    return ret;
+                }
+            }
+            return make_pair("", -1);
+        }
+        function_declarator_data_type* ddt = dynamic_cast<function_declarator_data_type*>(dt);
+        if(ddt == nullptr){
+            return make_pair("", -1);
+        }
+        return make_pair(ddt->name, ddt->args);
+    }
     class DataTypeStream{
     public:
         DataTypeStream(){
@@ -162,8 +259,46 @@ using namespace tree_sitter_util;
 
 namespace tree_sitter_data_structures {
     using namespace tree_sitter_declaration_space;
+    using variable_definition = pair<str, int>; //name + int
+    using variable_definition_body = vpdtpdt; //data_type* 
+    using MVD = map<variable_definition, variable_definition_body>; // -1 = variable
     class Scope{
     public:
+        bool isInserting = false;
+        MVD vvd;
+        vpdtpdt vUsage; 
+        void add_function(str name, int args, data_type * dt, data_type * dt2){
+            vvd[{name, args}].pb(mp(dt, dt2));
+        }
+        void add_variable(str name, data_type * dt, data_type * dt2){
+            vvd[{name, -1}].pb(mp(dt, dt2));
+        }
+        Scope * parent;
+        Scope(Scope * parent){
+            this->parent = parent;
+            isInserting = false;
+        }
+
+        void passdown(Scope & x){
+            x.buffer = this->buffer;
+            x.vUsage = vpdtpdt();
+            x.tsParser = this->tsParser;
+            x.isInserting = this->isInserting;
+        }
+
+        vpdtpdt getAllUsage(str name, int args){
+            vpdtpdt ret;
+            if(vvd.count({name, args}) == 0){
+                if(parent != nullptr){
+                    ret = parent->getAllUsage(name, args);
+                }
+            }
+            else{
+                ret = vvd[{name, args}];
+            }
+            return ret;
+        }
+        
         str * buffer;
         TSParser * tsParser;
         str getUnusedVariableName(){
@@ -218,8 +353,8 @@ namespace tree_sitter_simplified_proc {
         return ts_node_child(x, i);
     }
 
-
-    void getch(TSNode & x, function<void(TSNode)> y){
+    using lambda_child_travse = const function<void(TSNode)>&;
+    void getch(TSNode & x, lambda_child_travse y){
         rep(i, 0, cc(x)){
             y(ch(x,i));
         }
@@ -369,13 +504,20 @@ using parse_proc = function<void(TSNode&, Scope & , ReturnValue &)>;
 using parse_proc_ref = parse_proc &;
 using const_parse_proc_ref = const parse_proc &;
 class statement_handler;
-map<string, statement_handler*> statement_handlers;
+map<str, statement_handler*> statement_handlers;
 
 #define prel(x, y) data_type* dt = data_type::newInstance();\
 dt->type = type(x);\
 y.dt = nullptr;\
 \
 \
+
+#define prel_typed(x, y, tp) tp* dt = tp::newInstance();\
+dt->type = type(x);\
+y.dt = nullptr;\
+\
+\
+
 
 
 
@@ -406,16 +548,19 @@ public:
 //         return {};
 //     }
 //     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
-//         int curp = start(node);
-//         repb(child, node)   
-//             retVal.tb.write(substring(scope, curp, start(child)), scope);
-//             parse(child, scope, retVal);
-//             curp = end(child);
-//         repe
-//         if(curp != end(node)){
-//             retVal.tb.write( substring(scope, curp, end(node)) , scope);
-//         }
-//     }
+//          prel(node, retVal);
+//          int curp = start(node);
+//          repb(child, node)   
+//              addp(substring(scope, curp, start(child)));
+//              parse(child, scope, retVal);
+//              adds(retVal);
+//              curp = end(child);
+//          repe
+//          if(curp != end(node)){
+//              addp( substring(scope, curp, end(node)) );
+//          }
+//          posl(retVal);
+//      }
 // }x_statement_handler;
 
 class compound_statement : public statement_handler{
@@ -435,10 +580,7 @@ public:
             adds(retVal);
             curp = end(child);
         repe
-
-        if(curp != end(node)){
-            addp(substring(scope, curp, end(node)));
-        }
+        if(curp != end(node))  addp(substring(scope, curp, end(node)));
         posl(retVal);
     }
 
@@ -473,22 +615,26 @@ public:
     }
     map<str, str> replacingTypes;
 
+    void generateType(data_type * dt, Scope & scope, str & type, const_parse_proc_ref parse){
+        Scope nScope(nullptr);
+        nScope.copyParser(scope);
+        string tmps = type + " x;";
+        nScope.buffer = &tmps;
+        TSNode nRoot = nScope.getParsedNode();
+        ReturnValue nRetVal;
+        parse(nRoot, nScope, nRetVal); 
+        data_type * tmp = (*nRetVal.dt)[1];
+        dt->add((*tmp)[1]);
+        dt->isSequential = true;
+    }
+
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
         prel(node, retVal);
         int curp = start(node);
         str text = substring(scope, node);
         assert(cc(node) == 0);
         if(replacingTypes.count(text)){
-            Scope nScope;
-            nScope.copyParser(scope);
-            string tmps = replacingTypes[text] + " x;";
-            nScope.buffer = &tmps;
-            TSNode nRoot = nScope.getParsedNode();
-            ReturnValue nRetVal;
-            parse(nRoot, nScope, nRetVal); 
-            data_type * tmp = (*nRetVal.dt)[1];
-            dt->add((*tmp)[1]);
-            dt->isSequential = true;
+            generateType(dt, scope, replacingTypes[text], parse);
         }else{
             int vcnt = -1;
             rep(i, 0, sz(text)){
@@ -513,16 +659,7 @@ public:
                         rep(j, 0, vcnt){
                             ss << ">";
                         }
-                        str buffer = to_string(ss) + " x;";
-                        Scope nScope;
-                        nScope.copyParser(scope);
-                        nScope.buffer = &buffer;
-                        TSNode nRoot = nScope.getParsedNode();
-                        ReturnValue nRetVal;
-                        parse(nRoot, nScope, nRetVal); 
-                        data_type * tmp = (*nRetVal.dt)[1];
-                        dt->add((*tmp)[1]);
-                        dt->isSequential = true;
+                        generateType(dt, scope, to_string(ss), parse);
                         posl(retVal);
                         return;
                     }
@@ -838,12 +975,177 @@ public:
     }
 }repeat_statement_handler;
 
-map<str, str> allKinds;
+// TODO template_declaration handler
+class template_declaration : public statement_handler{
+public:
+    template_declaration(){
+        this->registerHandler(getAllTypes());
+    }
+    vs getAllTypes() override{
+        return {"template_declaration"};
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
+        int curp = start(node);
+        function_definition_data_type * functionDT = nullptr;
+        Scope nScope(&scope);
+        scope.passdown(nScope);
+
+        repb(child, node)   
+            addp(substring(nScope, curp, start(child)));
+            parse(child, nScope, retVal);
+            adds(retVal);
+            if(is_type(child, "function_definition")){
+                functionDT = dynamic_cast<function_definition_data_type*>(retVal.dt);
+            }
+            curp = end(child);
+        repe
+        
+        if(curp != end(node)) addp(substring(nScope, curp, end(node)));
+        if(functionDT){
+            data_type * ndt = data_type::newInstance();
+            ndt->content = "[insert function]";
+            ndt->type = "function_insertion";
+
+            auto fund = getFunctionDeclaration(dt);
+            scope.add_function(fund.f, fund.s, dt, ndt);
+            if(scope.isInserting){
+                retVal.dt = ndt;
+            }else{
+                retVal.dt = dt;
+            }
+        }
+        else{
+            posl(retVal);
+        }
+
+    }
+}template_declaration_handler;
+
+
+class function_declarator : public statement_handler{
+public:
+    function_declarator(){
+        this->registerHandler(getAllTypes());
+    }
+    vs getAllTypes() override{
+        return {"function_declarator"};
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+         prel_typed(node, retVal, function_declarator_data_type);
+         int curp = start(node);
+         parameter_list_data_type * fargc = nullptr;
+         data_type * fname = nullptr;
+         repb(child, node)   
+             addp(substring(scope, curp, start(child)));
+             parse(child, scope, retVal);
+             adds(retVal);
+             if(is_type(child, "parameter_list")){
+                fargc = dynamic_cast<parameter_list_data_type*>(retVal.dt);
+             }
+             if(is_type_of(child, set<str>{"identifier"})){
+                fname = retVal.dt; 
+             }
+             curp = end(child);
+         repe
+         if(curp != end(node)){
+             addp( substring(scope, curp, end(node)) );
+         }
+         if(fname){
+            dt->name = fname->toString();
+         }
+         if(fargc){
+            dt->args = fargc->getArgsCount();
+         }
+
+         posl(retVal);
+     }
+}function_declarator_handler;
+
+class function_definition : public statement_handler{
+public:
+    function_definition(){
+        this->registerHandler(getAllTypes());
+    }
+    vs getAllTypes() override{
+        return { "function_definition" };
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+         prel_typed(node, retVal, function_definition_data_type);
+         Scope nScope(&scope);
+         scope.passdown(nScope);
+
+         Scope & cScope = [&](){
+                if(!is_type(ts_node_parent(node), "template_declaration")){
+                    return nScope;
+                }else{
+                    return  scope;
+                }
+         }();
+         
+         
+         int curp = start(node);
+         repb(child, node)   
+             addp(substring(cScope, curp, start(child)));
+             parse(child, cScope, retVal);
+             adds(retVal);
+             curp = end(child);
+         repe
+         if(curp != end(node)) addp( substring(cScope, curp, end(node)) );
+         dt->usages = cScope.vUsage;
+         if(!is_type(ts_node_parent(node), "template_declaration")){
+            data_type * ndt = data_type::newInstance();
+            ndt->content = "[insert function]";
+            ndt->type = "function_insertion";
+            auto funcd = getFunctionDeclaration(dt);
+            scope.add_function(funcd.f, funcd.s, dt, ndt);
+            if(scope.isInserting){
+                retVal.dt = ndt;
+            }else{
+                retVal.dt = dt;
+            }
+         }
+         else{
+             posl(retVal);
+         }
+     }
+}x_statement_handler;
+
+class parameter_list : public statement_handler{
+public:
+    parameter_list(){
+        this->registerHandler(getAllTypes());
+    }
+    vector<string> getAllTypes() override{
+        return {"parameter_list"};
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+         prel_typed(node, retVal, parameter_list_data_type);
+         int curp = start(node);
+         
+         repb(child, node)   
+             addp(substring(scope, curp, start(child)));
+             parse(child, scope, retVal);
+             adds(retVal);
+             curp = end(child);
+         repe
+         if(curp != end(node)){
+             addp( substring(scope, curp, end(node)) );
+         }
+        int ct = dt->getArgsCount();
+         posl(retVal);
+     }
+    
+} parameter_list_handler;
+
+map<str, vector<str>> allKinds;
 void parse(TSNode & node, Scope & scope, ReturnValue & retval){
     prel(node, retval);
     str nodeType = type(node);
     str content = substring(scope, start(node), end(node));
-    if(c_dbg){ allKinds[nodeType] = content;} 
+    if(c_dbg){ 
+        allKinds[nodeType].pb(content);
+    } 
     if(statement_handlers.count(nodeType) != 0){
         statement_handlers[nodeType]->handle(node, scope, retval, parse);
         return;
@@ -877,7 +1179,7 @@ int main(){
     ts_parser_set_language(tsParser, tree_sitter_cpp());
 	
     TSNode root;
-    Scope scope;
+    Scope scope(nullptr);
     scope.buffer = &buffer;
     scope.tsParser = tsParser;
     root = scope.getParsedNode();
@@ -888,7 +1190,9 @@ int main(){
     if(c_dbg){
         each(x, allKinds){
             debug_buffer += "node type:"+ x.f + "\n";
-            debug_buffer += x.s + "\n";
+            each(y, x.s){
+                debug_buffer += "    " + y + "\n==\n";
+            }
             debug_buffer += "\n";
         }
     }
