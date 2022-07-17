@@ -12,16 +12,107 @@
 #include <assert.h>
 #include <clay.h>
 using namespace std;
-const int c_dbg = 1;
+#ifdef _DEBUG
+const int c_dbg = 0;
+#else
+const int c_dbg = 0;
+#endif
 // you can navigate using bread crumb
 
-str to_string(stringstream & x){
-    #undef str 
-    return x.str();
-    #define str string
-}
+
+
+namespace tree_sitter_memory_management{
+    class MemoryManager{
+    public:
+        template<typename T>
+        T* newInstance(){
+            return new T();
+        }
+    } memoryManager;
+};
+
+#define addp(s) if(true){ data_type* ndt = data_type::newInstance();\
+ndt->content =  s;\
+dt->sq.push_back(ndt);\
+dt->isSequential = true;\
+}\
+\
+\
+
+namespace tree_sitter_declaration_space {
+    using namespace tree_sitter_memory_management;
+    class data_type;
+    using Seq = vector<data_type*>;
+    class data_type{
+    public:
+        data_type(){
+            type = "";
+            sq = Seq();
+            isSequential = false; 
+            content = "";
+        }
+        str type; 
+        Seq sq;
+        bool isSequential;
+        str content; 
+        static data_type * newInstance(){
+            return memoryManager.newInstance<data_type>();
+        } 
+        void add(data_type * d){
+            sq.pb(d);
+        }
+        void addAll(const Seq & s){
+            each(d, s){
+                sq.pb(d);
+            }
+        }
+        void show(){
+            cout << content ;
+            rep(i, 0, sq.size()){
+                sq[i]->show();
+            }
+        }
+        data_type * operator[](int idx){
+            return sq[idx];
+        }
+        size_t size(){
+            return sq.size();
+        }
+    };
+    class DataTypeStream{
+    public:
+        DataTypeStream(){
+            dt = data_type::newInstance();
+        }
+        data_type * dt;
+        DataTypeStream& operator<<(str s){
+            addp(s);
+            return *this;
+        }        
+        DataTypeStream& operator<<(data_type * d){
+            dt->add(d);
+            dt->isSequential = true;
+            return *this;
+        }
+        data_type * getDataType(){
+            return dt;
+        }
+        Seq getSeq(){
+            return dt->sq;
+        }
+    };
+};
+
+using namespace tree_sitter_declaration_space;
+
+
 
 namespace tree_sitter_util {
+    str to_string(stringstream & x){
+        #undef str 
+        return x.str();
+        #define str string
+    }
     template<typename T>
     set<T> toSet(vector<T> & t){
         set<T> s;
@@ -53,72 +144,39 @@ namespace tree_sitter_util {
 using namespace tree_sitter_util;
 
 namespace tree_sitter_data_structures {
+    using namespace tree_sitter_declaration_space;
     class Scope{
     public:
         str * buffer;
         TSParser * tsParser;
-        bool isInit;
-        bool isTopLevel;
-        int level = 0;
         str getUnusedVariableName(){
             // todo
             return "";
         }
-    };
-
-    class TemporaryBuffer{
-    public:
-        TemporaryBuffer() : _buffer(), _currentLine(), newline(true), firstchar(true) {}
-
-        str _buffer;
-        str _currentLine;
-        bool newline = true;
-        bool firstchar = true;
-        void write(str & tmp, Scope & scope){
-            rep(i, 0, tmp.length()){
-                // if tmp[i] is space
-                if(firstchar){
-                    _buffer += str(scope.level, '\t');
-                    firstchar = false;
-                }
-                if(tmp[i] == ' ' || tmp[i] == '\t'){
-                    if(!newline)  _currentLine += tmp[i];
-                }else if(tmp[i] == '\n'){
-                    //add level \t 
-                    _buffer += _currentLine;
-                    _buffer += '\n';
-                    _currentLine = "";
-                    newline = true;
-                    firstchar = true;
-                }else{
-                    _currentLine += tmp[i];
-                    newline = false;
-                }
-            } 
+        void copyParser(Scope & x){
+            tsParser = x.tsParser;
         }
-        void writeMandatory(str & tmp, Scope & scope){
-            str ept = "\n";
-            write(ept, scope);
-            _buffer += tmp;
-            write(ept, scope);
-        }
-        void show(){
-            cout << _buffer<<endl;
-        }
-        str getBuffer(){
-            if(_currentLine != ""){
-                _buffer += _currentLine;            
-            }
-            return _buffer;
+        TSNode getParsedNode(){
+            str & buffer = *this->buffer;
+            TSParser * tsParser = this->tsParser;
+            TSTree * tree = ts_parser_parse_string(
+                tsParser,
+                NULL,
+                buffer.c_str(),
+                sz(buffer)
+            );
+            return ts_tree_root_node(tree);
         }
     };
+    
+    
     
     class ReturnValue{
     public:
-        ReturnValue() : tb(){
-    
+        ReturnValue(){
+            dt = nullptr;
         }
-        TemporaryBuffer tb;
+        data_type* dt;
     };
 }
 
@@ -171,10 +229,10 @@ namespace tree_sitter_simplified_proc {
         while(nextp != -1){
             nextp = s.find(delim, curp);
             if(nextp != -1){
-                ret.push_back(s.substr(curp, nextp - curp));
+                ret.pb(s.substr(curp, nextp - curp));
                 curp = nextp + sz(delim);
             }else{
-                ret.push_back(s.substr(curp));
+                ret.pb(s.substr(curp));
             }
         }
         return ret;
@@ -189,30 +247,75 @@ namespace tree_sitter_simplified_proc {
         }
         return ret;
     }
+
+    data_type * Implode(vs s, data_type* delim){
+        data_type * dt = new data_type();
+        rep(i, 0, sz(s)){
+            addp( s[i]);
+            if(i + 1 != sz(s)){
+                dt->add(delim);
+            }
+        }
+        return dt;
+    }
 }
 using namespace  tree_sitter_simplified_proc;
+
+namespace tree_sitter_debug_namespace {
+    class debugString{
+    public:
+        str s;
+        debugString(str x) : s(x){
+        }
+        debugString(){
+            s = "";
+        }
+        str operator()(){
+            return s;
+        }
+        debugString operator+(debugString & x){
+            return debugString(s + x.s);
+        }
+        debugString operator+(str x){
+            return debugString(s + x);
+        }
+        debugString& operator+=(str x){
+            s += x;
+            return *this;
+        }
+    };
+
+    ostream & operator<<(ostream & os, debugString & x){
+        if(c_dbg){
+            os << x();
+        }
+        return os;
+    }
+};
+
+
+
+using namespace tree_sitter_debug_namespace;
+
+
+
 extern "C" {
      TSLanguage* tree_sitter_cpp();
 }
 
 
+
 #define repb(i, x) getch(x, [&](TSNode i){ str p_content = substring(scope, x);
 #define repe });
 
-str debug_buffer; // for c_dbg
 
 
-void getParsedNode(TSNode & root /*Out*/, Scope & scope /*In*/ ){
-    str & buffer = *scope.buffer;
-    TSParser * tsParser = scope.tsParser;
-    TSTree * tree = ts_parser_parse_string(
-        tsParser,
-        NULL,
-        buffer.c_str(),
-		sz(buffer)
-    );
-	root = ts_tree_root_node(tree);
-}
+
+
+debugString debug_buffer; // for c_dbg
+
+
+
 
 //function prototype void parse(TSNode & node, Scope & scope, ReturnValue & retval)
 
@@ -222,13 +325,22 @@ using const_parse_proc_ref = const parse_proc &;
 class statement_handler;
 map<string, statement_handler*> statement_handlers;
 
-class MemoryManager{
-public:
-    template<typename T>
-    T* newInstance(){
-        return new T();
-    }
-} memoryManager;
+#define prel(x, y) data_type* dt = data_type::newInstance();\
+dt->type = type(x);\
+y.dt = nullptr;\
+\
+\
+
+
+
+#define adds(s)             dt->isSequential = true;\
+dt->sq.push_back(s.dt);\
+\
+
+
+#define posl(x) x.dt = dt;
+
+
 
 class statement_handler{
 public:
@@ -269,17 +381,19 @@ public:
         return {"compound_statement", "declaration_list", "field_declaration_list"};
     }
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
         int curp = start(node);
         repb(child, node)   
-            if(is_type(child, "}")) scope.level--;
-            retVal.tb.write(substring(scope, curp, start(child)), scope);
+            addp(substring(scope, curp, start(child)));
             parse(child, scope, retVal);
+            adds(retVal);
             curp = end(child);
-            if(is_type(child, "{")) scope.level++;
         repe
+
         if(curp != end(node)){
-            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+            addp(substring(scope, curp, end(node)));
         }
+        posl(retVal);
     }
 
 }compound_like_statement_handler;
@@ -314,11 +428,20 @@ public:
     map<str, str> replacingTypes;
 
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
         int curp = start(node);
         str text = substring(scope, node);
         assert(cc(node) == 0);
         if(replacingTypes.count(text)){
-            retVal.tb.write(replacingTypes[text], scope);
+            Scope nScope;
+            nScope.copyParser(scope);
+            nScope.buffer = &replacingTypes[text];
+            TSNode nRoot = nScope.getParsedNode();
+            ReturnValue nRetVal;
+            parse(nRoot, nScope, nRetVal); 
+            data_type * tmp = (*nRetVal.dt)[1];
+            dt->add((*tmp)[1]);
+            dt->isSequential = true;
         }else{
             int vcnt = -1;
             rep(i, 0, sz(text)){
@@ -344,13 +467,24 @@ public:
                         rep(j, 0, vcnt){
                             ss << ">";
                         }
-                        retVal.tb.write(to_string(ss), scope);
+                        str buffer = to_string(ss) + " x;";
+                        Scope nScope;
+                        nScope.copyParser(scope);
+                        nScope.buffer = &buffer;
+                        TSNode nRoot = nScope.getParsedNode();
+                        ReturnValue nRetVal;
+                        parse(nRoot, nScope, nRetVal); 
+                        data_type * tmp = (*nRetVal.dt)[1];
+                        dt->add((*tmp)[1]);
+                        dt->isSequential = true;
+                        posl(retVal);
                         return;
                     }
                 }
             }
-            retVal.tb.write( text , scope);
+            addp(text);
         }
+        posl(retVal);
     }
 
 }type_identifier_handler;
@@ -379,11 +513,13 @@ public:
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
         assert(cc(node) == 0);
         str text = substring(scope, node);
+        prel(node, retVal);
         if(replacingTypes.count(text)){
-            retVal.tb.write(replacingTypes[text], scope);
+            addp(replacingTypes[text]);
         }else{
-            retVal.tb.write( text , scope);
+            addp(text);
         }
+        posl(retVal);
     }
 }field_identifier_handler;
 
@@ -404,10 +540,20 @@ public:
         replacingFieldTypes["msk2"] = "((1<<(args))-1)";
     }
 
-    str toFun(str functionName, str args){
+    data_type* toFun(str functionName, data_type* _args){
         string x = replacingFieldTypes[functionName];
+        data_type * args = (*_args)[0];
+        Seq sq; 
+        rep(i, 0, sz(*args)){
+            data_type* cur = (*args)[i];
+            if(cur->type == "") continue;
+            if(cur->type == "(") continue;
+            if(cur->type == ")") continue;
+            if(cur->type == ",") continue;
+            sq.push_back(cur);
+        }
         // replace "args" with args 
-        return Implode(Explode(x, "args"), args);
+        return Implode(Explode(x, "args"), sq[0]);
     }
 
     map<str, str> replacingTypes;
@@ -416,10 +562,12 @@ public:
         return { "call_expression" };
     }
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
         int curp = start(node);
         bool sentenced = false;
         ReturnValue tmp;
         string funName = "";
+        data_type * tdt = data_type::newInstance();
         repb(child, node)
             string ctext = substring(scope, child);   
             if(is_type(child, "identifier")){
@@ -428,37 +576,40 @@ public:
                     sentenced = true;
                 }
             }else{
-                int level  = scope.level;
-                scope.level = 0;
-                if(sentenced)  parse(child, scope, tmp);
-                scope.level = level;
+                if(sentenced)  {
+                    parse(child, scope, tmp);
+                    tdt->add(tmp.dt);
+                }
             }
             curp = end(child);
         repe
         if(sentenced){
-            string args = tmp.tb.getBuffer();
-            retVal.tb.write(toFun(funName, args), scope);
-            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+            auto args = tdt;
+            dt->add(toFun(funName, args));
+            addp( substring(scope, curp, end(node)) );
+            posl(retVal);
             return;
         }
         curp = start(node);
         repb(child, node)
             string ctext = substring(scope, child);   
-            retVal.tb.write(substring(scope, curp, start(child)), scope);
+            addp(substring(scope, curp, start(child)));
             if(is_type(child, "identifier")){
                 if(replacingTypes.count(ctext)){
-                    retVal.tb.write(replacingTypes[ctext], scope);
+                    addp(replacingTypes[ctext]);
                 }else{
-                    retVal.tb.write(ctext, scope);
+                    addp(ctext);
                 }
             }else{
                 parse(child, scope, retVal);
+                adds(retVal);
             }
             curp = end(child);
         repe
         if(curp != end(node)){
-            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+            addp( substring(scope, curp, end(node)) );
         }
+        posl(retVal);
     }
 }call_expression_handler;
 
@@ -477,13 +628,15 @@ public:
     }
     map<str, str> replacingTypes;
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
         string text = substring(scope, node);
         assert(cc(node) == 0);
         if(replacingTypes.count(text)){
-            retVal.tb.write(replacingTypes[text], scope);
+            addp(replacingTypes[text]);
         }else{
-            retVal.tb.write( text , scope);
+            addp(text);
         }
+        posl(retVal);
     }
 }identifier_handler;
 
@@ -504,50 +657,49 @@ public:
     }
 
     void handleTemplate(str & head, 
-                        str  & templateFormulation,
-                        vs & positionArgs,
-                        str & body,
+                        str &  templateFormulation,
+                        vector<data_type*> & positionArgs,
+                        data_type* body,
                         Scope & scope,
-                        ReturnValue & retVal){
-    scope.level ++;
-    // process the head
-    stringstream ss;
-    ss << endl;
-    // todo if positionArgs[0] is already within the scope
-    if(head == "rep" && templateFormulation == "()"){
-        // todo if we have get unused variable name from scope
-        str unusedName = scope.getUnusedVariableName();
-        ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
-    }
-    if(head == "rep" && templateFormulation == "(,)"){
-        ss << "for(int " << positionArgs[0] << " = ("<<0 << "); "<< positionArgs[0] << " < (" <<  positionArgs[1] << "); "<< positionArgs[0] <<"++)";
-    }
-    if(head == "rep" && templateFormulation == "(,,)"){    
-        ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"++)";
-    }
-    if (head == "rep" &&  templateFormulation == "(,,,)"){
-        ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
-    }
-    if(head == "each" && templateFormulation == "(,)"){
-        ss << "for(auto & " << positionArgs[0] << " : " << positionArgs[1] << ")";
-    }
-    retVal.tb.write(to_string(ss), scope);
-    // process the body if we keep the body intact
-    retVal.tb.writeMandatory(body, scope);
+                        data_type * retVal){
     
-    // process the tail
-    scope.level --;
+        // process the head
+        DataTypeStream ss;
+        // todo if positionArgs[0] is already within the scope
+        if(head == "rep" && templateFormulation == "()"){
+            // todo if we have get unused variable name from scope
+            str unusedName = scope.getUnusedVariableName();
+            ss << "for(int " << unusedName << " = ("<<0 << "); "<<  unusedName << " < (" <<  positionArgs[0] << "); "<< unusedName <<"++)";
+        }
+        if(head == "rep" && templateFormulation == "(,)"){
+            ss << "for(int " << positionArgs[0] << " = ("<<0 << "); "<< positionArgs[0] << " < (" <<  positionArgs[1] << "); "<< positionArgs[0] <<"++)";
+        }
+        if(head == "rep" && templateFormulation == "(,,)"){    
+            ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"++)";
+        }
+        if (head == "rep" &&  templateFormulation == "(,,,)"){
+            ss << "for(int " << positionArgs[0] << " = ("<< positionArgs[1] << "); "<< positionArgs[0] << " < (" << positionArgs[2] << "); "<< positionArgs[0] <<"+= (" << positionArgs[3] << "))";
+        }
+        if(head == "each" && templateFormulation == "(,)"){
+            ss << "for(auto & " << positionArgs[0] << " : " << positionArgs[1] << ")";
+        }
+        retVal->addAll(ss.getSeq());
+        // process the body if we keep the body intact
+        retVal->add(body);
+        
+        // process the tail
     }
 
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        prel(node, retVal);
         int curp = start(node);
         set<str> importantTypes = toSet(getImportantToken());
         set<str> originatorTypes = toSet(getRepeatKeyTypes());
         str templateFormulation = "";
         str head = "";
-        vs positionArgs;
+        vector<data_type*> positionArgs;
         bool encountered = false;
-        str rest;
+        data_type* rest;
         repb(child, node)   
             if(is_type(child, ")")) encountered = true;
             if(is_type_of(child, importantTypes)){
@@ -560,48 +712,45 @@ public:
             }
             if(!encountered){
                 ReturnValue tmp;
-                int curlevel = scope.level;
-                scope.level = 0;
                 parse(child, scope, tmp);
-                scope.level = curlevel;
                 curp = end(child);
-                positionArgs.push_back(tmp.tb.getBuffer());
+                positionArgs.pb(tmp.dt);
             }else{
                 ReturnValue tmp;
-                scope.level++;
                 parse(child, scope, tmp);
-                scope.level--;
                 curp = end(child);
-                rest = tmp.tb.getBuffer();
+                rest = tmp.dt;
             }
         repe
-        // if(c_dbg){
-        //     debug_buffer += "repeat_statemen=" + head + ":" + templateFormulation + "\n";
-        //     debug_buffer += "arguments=" + toString(positionArgs) + "\n";
-        // } 
-        handleTemplate(head, templateFormulation, positionArgs, rest, scope, retVal);
+        handleTemplate(head, templateFormulation, positionArgs, rest, scope, dt);
         if(curp != end(node)){
-            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+            addp( substring(scope, curp, end(node)) );
         }
+        posl(retVal);
     }
 }repeat_statement_handler;
 
 map<str, str> allKinds;
 void parse(TSNode & node, Scope & scope, ReturnValue & retval){
+    prel(node, retval);
     str nodeType = type(node);
     str content = substring(scope, start(node), end(node));
+    if(c_dbg){ allKinds[nodeType] = content;} 
     if(statement_handlers.count(nodeType) != 0){
         statement_handlers[nodeType]->handle(node, scope, retval, parse);
         return;
     }
-    if(c_dbg){ allKinds[nodeType] = content;} 
     int curp = start(node);
     repb(child, node)
-        retval.tb.write(substring(scope, curp, start(child)), scope);
+        addp(substring(scope, curp, start(child)));
         parse(child, scope, retval);
+        adds(retval);
         curp = end(child);
     repe
-    if(curp != end(node)){ retval.tb.write( substring(scope, curp, end(node)) , scope); }
+    if(curp != end(node)){ 
+        addp( substring(scope, curp, end(node)) );
+    }
+    posl(retval);
 }
 
 
@@ -623,10 +772,10 @@ int main(){
     Scope scope;
     scope.buffer = &buffer;
     scope.tsParser = tsParser;
-    getParsedNode(root, scope);
+    root = scope.getParsedNode();
     ReturnValue retval;
     parse(root, scope, retval);
-    retval.tb.show();
+    retval.dt->show();
     //print all kinds
     if(c_dbg){
         each(x, allKinds){
