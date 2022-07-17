@@ -53,3 +53,4 @@ Release
 *.pdb
 
 *.txt
+input.cpp

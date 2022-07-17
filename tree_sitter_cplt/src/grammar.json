@@ -5110,6 +5110,10 @@
             },
             {
               "type": "SYMBOL",
+              "name": "template_automation_expression"
+            },
+            {
+              "type": "SYMBOL",
               "name": "conditional_expression"
             },
             {
@@ -5273,6 +5277,23 @@
         {
           "type": "SYMBOL",
           "name": "fold_expression"
+        }
+      ]
+    },
+    "template_automation_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "TA"
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "SYMBOL",
+            "name": "declaration_list"
+          }
         }
       ]
     },

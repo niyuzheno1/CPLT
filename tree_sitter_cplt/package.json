@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build" : "tree-sitter generate",
-    "test" : "tree-sitter parse example.txt",
+    "test" : "tree-sitter parse ../input.cpp ",
     "test-windows": "tree-sitter test"
   },
   "tree-sitter": [

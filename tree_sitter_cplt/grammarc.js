@@ -732,6 +732,7 @@ module.exports = grammar({
 
     _expression: $ => choice(
       $.if_expression,
+      $.template_automation_expression,
       $.conditional_expression,
       // $.multiprocesses_expression,
       $.assignment_expression,
@@ -760,6 +761,10 @@ module.exports = grammar({
       $.range_result_statement,
       $.repeat_statement,
       $.binary_search_expression,
+    ),
+    template_automation_expression: $ => seq(
+      "TA",
+      field('value', $.declaration_list)
     ),
 
     if_expression: $ => prec.left(seq(

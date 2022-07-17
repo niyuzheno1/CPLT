@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <clay.h>
 using namespace std;
-const int c_dbg = 0;
+const int c_dbg = 1;
 // you can navigate using bread crumb
 
 str to_string(stringstream & x){
@@ -39,9 +39,9 @@ namespace tree_sitter_util {
     str toString(vector<T> & t){
         stringstream ss;
         ss << "[";
-        rep(i, 0, t.size()){
+        rep(i, 0, sz(t)){
             ss << t[i];
-            if(i != t.size() - 1)
+            if(i != sz(t) - 1)
                 ss << ", ";
         }
         ss << "]";
@@ -163,11 +163,34 @@ namespace tree_sitter_simplified_proc {
     str substring(Scope & scope, TSNode x){
         return substring(scope, start(x), end(x));
     }
+
+    vs Explode(str s, str delim){
+        vs ret;
+        int curp = 0;
+        int nextp = 0;
+        while(nextp != -1){
+            nextp = s.find(delim, curp);
+            if(nextp != -1){
+                ret.push_back(s.substr(curp, nextp - curp));
+                curp = nextp + sz(delim);
+            }else{
+                ret.push_back(s.substr(curp));
+            }
+        }
+        return ret;
+    }
+    str Implode(vs s, str delim){
+        str ret;
+        rep(i, 0, sz(s)){
+            if(i != 0){
+                ret += delim;
+            }
+            ret += s[i];
+        }
+        return ret;
+    }
 }
-
 using namespace  tree_sitter_simplified_proc;
-
-
 extern "C" {
      TSLanguage* tree_sitter_cpp();
 }
@@ -186,7 +209,7 @@ void getParsedNode(TSNode & root /*Out*/, Scope & scope /*In*/ ){
         tsParser,
         NULL,
         buffer.c_str(),
-		buffer.size()
+		sz(buffer)
     );
 	root = ts_tree_root_node(tree);
 }
@@ -215,6 +238,27 @@ public:
     virtual vs getAllTypes() = 0;
     virtual void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) = 0;
 };
+// template for statement handler
+// class x_statement : public statement_handler{
+// public:
+//     x_statement(){
+//         this->registerHandler(getAllTypes());
+//     }
+//     vs getAllTypes() override{
+//         return {};
+//     }
+//     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+//         int curp = start(node);
+//         repb(child, node)   
+//             retVal.tb.write(substring(scope, curp, start(child)), scope);
+//             parse(child, scope, retVal);
+//             curp = end(child);
+//         repe
+//         if(curp != end(node)){
+//             retVal.tb.write( substring(scope, curp, end(node)) , scope);
+//         }
+//     }
+// }x_statement_handler;
 
 class compound_statement : public statement_handler{
 public:
@@ -259,6 +303,9 @@ public:
         replacingTypes["vpi"] = "vector<pair<int, int>>";
         replacingTypes["vpl"] = "vector<pair<long long, long long>>";
         replacingTypes["vpd"] = "vector<pair<long double, long double>>";
+        replacingTypes["pi"] = "pair<int, int>";
+        replacingTypes["pl"] = "pair<long long, long long>";
+        replacingTypes["pd"] = "pair<long double, long double>";
         this->registerHandler(getAllTypes());
     }
     vs getAllTypes() override{
@@ -274,7 +321,7 @@ public:
             retVal.tb.write(replacingTypes[text], scope);
         }else{
             int vcnt = -1;
-            rep(i, 0, text.size()){
+            rep(i, 0, sz(text)){
                 if(text[i] == 'v'){
                     ++vcnt;
                 }else{
@@ -285,7 +332,7 @@ public:
             
             if(vcnt >= 0){
                 str sub = text.substr(vcnt);
-                if(sub.size() > 0){
+                if(sz(sub) > 0){
                     if(sub[0] == 'v' && replacingTypes.count(sub)){
                         stringstream ss;
                         //add vector before 
@@ -307,6 +354,139 @@ public:
     }
 
 }type_identifier_handler;
+
+//field_identifier
+class field_identifier : public statement_handler{
+public:
+    field_identifier(){
+        this->registerHandler(getAllTypes());
+        replacingTypes["f"] = "first";
+        replacingTypes["s"] = "second";
+        replacingTypes["rsz"] = "resize";    
+        replacingTypes["ins"] = "insert";
+        replacingTypes["pb"] = "push_back";
+        replacingTypes["eb"] = "emplace_back";
+        replacingTypes["ft"] = "front";
+        replacingTypes["bk"] = "back";
+        replacingTypes["tp"] = "top";
+        replacingTypes["rbg"] = "rbegin";
+        replacingTypes["red"] = "rend";
+    }
+    map<str, str> replacingTypes;
+    vs getAllTypes() override{
+        return { "field_identifier" };
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        assert(cc(node) == 0);
+        str text = substring(scope, node);
+        if(replacingTypes.count(text)){
+            retVal.tb.write(replacingTypes[text], scope);
+        }else{
+            retVal.tb.write( text , scope);
+        }
+    }
+}field_identifier_handler;
+
+//call_expression
+class call_expression : public statement_handler{
+public:
+    call_expression(){
+        this->registerHandler(getAllTypes());
+        replacingTypes["mp"] = "make_pair";
+        replacingFieldTypes["sz"] = "(int)(args.size())";
+        replacingTypes["bg"] = "begin";
+        replacingTypes["ed"] = "end";
+        replacingTypes["pct"] = "__builtin_popcount";
+        replacingFieldTypes["all"] = "begin(args), end(args)";
+        replacingFieldTypes["rall"] = "rbegin(args), rend(args)";
+        replacingFieldTypes["bits"] = "(args == 0 ? 0 : 31-__builtin_clz(args))";
+        replacingFieldTypes["p2"] = "(1<<(args))";
+        replacingFieldTypes["msk2"] = "((1<<(args))-1)";
+    }
+
+    str toFun(str functionName, str args){
+        string x = replacingFieldTypes[functionName];
+        // replace "args" with args 
+        return Implode(Explode(x, "args"), args);
+    }
+
+    map<str, str> replacingTypes;
+    map<str, str> replacingFieldTypes;
+    vs getAllTypes() override{
+        return { "call_expression" };
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        int curp = start(node);
+        bool sentenced = false;
+        ReturnValue tmp;
+        string funName = "";
+        repb(child, node)
+            string ctext = substring(scope, child);   
+            if(is_type(child, "identifier")){
+                if(replacingFieldTypes.count(ctext)){
+                    funName = ctext;
+                    sentenced = true;
+                }
+            }else{
+                int level  = scope.level;
+                scope.level = 0;
+                if(sentenced)  parse(child, scope, tmp);
+                scope.level = level;
+            }
+            curp = end(child);
+        repe
+        if(sentenced){
+            string args = tmp.tb.getBuffer();
+            retVal.tb.write(toFun(funName, args), scope);
+            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+            return;
+        }
+        curp = start(node);
+        repb(child, node)
+            string ctext = substring(scope, child);   
+            retVal.tb.write(substring(scope, curp, start(child)), scope);
+            if(is_type(child, "identifier")){
+                if(replacingTypes.count(ctext)){
+                    retVal.tb.write(replacingTypes[ctext], scope);
+                }else{
+                    retVal.tb.write(ctext, scope);
+                }
+            }else{
+                parse(child, scope, retVal);
+            }
+            curp = end(child);
+        repe
+        if(curp != end(node)){
+            retVal.tb.write( substring(scope, curp, end(node)) , scope);
+        }
+    }
+}call_expression_handler;
+
+//identifier
+class identifier : public statement_handler{
+public:
+    identifier(){
+        this->registerHandler(getAllTypes());
+        replacingTypes["int_inf"] = "1073709056";
+        replacingTypes["ll_inf"] = "4611686016279904256LL";
+        replacingTypes["double_inf"] = "1e150";
+        replacingTypes["PI"] = "3.14159265359";
+    }
+    vs getAllTypes() override{
+        return { "identifier" };
+    }
+    map<str, str> replacingTypes;
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+        string text = substring(scope, node);
+        assert(cc(node) == 0);
+        if(replacingTypes.count(text)){
+            retVal.tb.write(replacingTypes[text], scope);
+        }else{
+            retVal.tb.write( text , scope);
+        }
+    }
+}identifier_handler;
+
 
 class repeat_statement : public statement_handler{
 public:
@@ -450,8 +630,8 @@ int main(){
     //print all kinds
     if(c_dbg){
         each(x, allKinds){
-            debug_buffer += "node type:"+ x.first + "\n";
-            debug_buffer += x.second + "\n";
+            debug_buffer += "node type:"+ x.f + "\n";
+            debug_buffer += x.s + "\n";
             debug_buffer += "\n";
         }
     }

@@ -232,6 +232,10 @@
         "named": true
       },
       {
+        "type": "template_automation_expression",
+        "named": true
+      },
+      {
         "type": "template_function",
         "named": true
       },
@@ -5714,6 +5718,22 @@
     }
   },
   {
+    "type": "template_automation_expression",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "declaration_list",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "template_declaration",
     "named": true,
     "fields": {
@@ -6797,6 +6817,10 @@
   },
   {
     "type": "RREP",
+    "named": false
+  },
+  {
+    "type": "TA",
     "named": false
   },
   {

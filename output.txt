@@ -1,7 +1,6 @@
 int main(){
-	ll x; 
-	db y;
-	str z;
+	long long x, y;
+	chmin(x, y);
 }
 
 node type:(
@@ -10,24 +9,29 @@ node type:(
 node type:)
 )
 
+node type:,
+,
+
 node type:;
 ;
 
+node type:argument_list
+(x, y)
+
 node type:declaration
-str z;
+ll x, y;
+
+node type:expression_statement
+chmin(x, y);
 
 node type:function_declarator
 main()
 
 node type:function_definition
 int main(){
-    ll x; 
-    db y;
-    str z;
+	ll x, y;
+    chmin(x, y);
 }
-
-node type:identifier
-z
 
 node type:parameter_list
 ()
@@ -37,14 +41,10 @@ int
 
 node type:translation_unit
 int main(){
-    ll x; 
-    db y;
-    str z;
+	ll x, y;
+    chmin(x, y);
 }
 
-
-node type:type_identifier
-str
 
 node type:{
 {
