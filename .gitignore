@@ -54,3 +54,5 @@ Release
 
 *.txt
 input.cpp
+
+tree_sitter_exe/src/*.cpp

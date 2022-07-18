@@ -1,3 +1,0 @@
-int w; 
-template<class T, size_t  SZ> int lwb(vector<T>& a, const T& b) { return int(lb(begin(a), end(a),b)-begin(a)); }
-template<class T> int upb(vector<T>& a, const T& b) { return int(ub(begin(a), end(a),b)-begin(a)); }

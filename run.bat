@@ -1,1 +1,1 @@
-.\Debug\tree_sitter_exe.exe < input.cpp > output.txt
+.\Debug\tree_sitter_exe.exe 0< input.cpp 1> output.txt 2> output1.txt
