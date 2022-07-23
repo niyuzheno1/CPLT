@@ -454,21 +454,6 @@ namespace tree_sitter_simplified_proc {
         return substring(scope, start(x), end(x));
     }
 
-    // vs Explode(str s, str delim){
-    //     vs ret;
-    //     int curp = 0;
-    //     int nextp = 0;
-    //     while(nextp != -1){
-    //         nextp = s.find(delim, curp);
-    //         if(nextp != -1){
-    //             ret.pb(s.substr(curp, nextp - curp));
-    //             curp = nextp + sz(delim);
-    //         }else{
-    //             ret.pb(s.substr(curp));
-    //         }
-    //     }
-    //     return ret;
-    // }
     Seq Explode(const str & x, str delim){
         Seq ret;
         int curp = 0;
@@ -581,12 +566,8 @@ extern "C" {
      TSLanguage* tree_sitter_cpp();
 }
 
-
 #define repb(i, x) getch(x, [&](TSNode i){ str p_content = substring(scope, x);
 #define repe });
-
-
-
 
 //function prototype void parse(TSNode & node, Scope & scope, ReturnValue & retval)
 
@@ -608,17 +589,11 @@ y.dt = nullptr;\
 \
 \
 
-
-
-
 #define adds(s)             dt->isSequential = true;\
 dt->sq.push_back(s.dt);\
 \
 
-
 #define posl(x) x.dt = dt;
-
-
 
 class statement_handler{
 public:
