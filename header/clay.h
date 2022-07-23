@@ -24,3 +24,4 @@ using u32 = unsigned int;
 #define ft front()
 #define bk back()
 #define rrep(x, y, z) for (int x = (y); x >= (z); x--)
+#define mp make_pair

@@ -19,7 +19,7 @@ const int c_dbg = 0;
 #endif
 // you can navigate using bread crumb
 
-bool forced_display_variable_insertion = false;
+bool forced_display_variable_insertion = true;
 
 //linking_begin
 //linking_end
@@ -1176,15 +1176,21 @@ public:
          
          int curp = start(node);
          repb(child, node)   
+             bool isInsertingDeclarationForScope = scope.isInserting;
+             bool isInsertingDeclarationForVariable = forced_display_variable_insertion;
+             scope.isInserting = false;
+             forced_display_variable_insertion = false;  
              addp(substring(cScope, curp, start(child)));
              parse(child, cScope, retVal);
              adds(retVal);
              curp = end(child);
+             scope.isInserting = isInsertingDeclarationForScope;
+            forced_display_variable_insertion = isInsertingDeclarationForVariable;
          repe
          if(curp != end(node)) addp( substring(cScope, curp, end(node)) );
          dt->usages = cScope.vUsage;
          if(!is_type(ts_node_parent(node), "template_declaration")){
-            retVal.dt  = addDeclaration(dt, scope, true);
+            retVal.dt  = dt;//addDeclaration(dt, scope, true);
          }
          else{
              posl(retVal);
@@ -1430,7 +1436,6 @@ int main(){
     retval.dt->show();
     //print all kinds
     retval.dt->show_debug(0);
- 
 
     return 0;
 }
