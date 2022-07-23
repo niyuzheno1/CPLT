@@ -162,6 +162,23 @@ namespace tree_sitter_declaration_space {
             return memoryManager.newInstance<function_definition_data_type>();
         }
     };
+    
+    class alias_declaration_data_type : public data_type{
+    public:
+        vpdtpdt usages;
+        alias_declaration_data_type(){
+            data_type();
+            type = "alias_declaration";
+            usages = vpdtpdt();
+        }
+        str getBaseType() override{
+            return "alias_declaration";
+        }
+        static alias_declaration_data_type * newInstance(){
+            return memoryManager.newInstance<alias_declaration_data_type>();
+        }
+    };
+
 
     class parameter_list_data_type : public data_type{
     public:
@@ -214,6 +231,8 @@ namespace tree_sitter_declaration_space {
                 }
                 return "";
             }
+            //usages
+            vpdtpdt usages;
     };
    
     class function_declarator_data_type : public data_type{
@@ -254,7 +273,7 @@ namespace tree_sitter_declaration_space {
         return make_pair(ddt->name, ddt->args);
     }
     str getVariableDeclaration(data_type * dt){
-        if(dt->type != "identifier"){
+        if(dt->type != "identifier" && dt->type != "type_identifier"){
             each(y, dt->sq){
                 auto ret = getVariableDeclaration(y);
                 if(ret != ""){
@@ -336,7 +355,6 @@ namespace tree_sitter_data_structures {
     public:
         bool isInserting = false;
         MVD vvd;
-        MVD types; 
         vpdtpdt vUsage; 
         void add_function(str name, int args, data_type * dt, data_type * dt2){
             vvd[{name, args}].pb(mp(dt, dt2));
@@ -344,10 +362,7 @@ namespace tree_sitter_data_structures {
         void add_variable(str name, data_type * dt, data_type * dt2){
             vvd[{name, -1}].pb(mp(dt, dt2));
         }
-        // include classes and aliases and structs and unions and enums and typedefs
-        void add_type(str name, data_type * dt, data_type * dt2){
-            types[{name, -1}].pb(mp(dt, dt2));
-        }
+        
         Scope * parent;
         Scope(Scope * parent){
             this->parent = parent;
@@ -373,6 +388,7 @@ namespace tree_sitter_data_structures {
             }
             return ret;
         }
+        
         
         str * buffer;
         TSParser * tsParser;
@@ -1116,30 +1132,29 @@ public:
 
          Scope & cScope = [&](){
                 if(!is_type(ts_node_parent(node), "template_declaration")){
-                    return nScope;
+                    return nScope; // we will use the new scope if our parent isn't a template_declaration
                 }else{
                     return  scope;
                 }
-         }();
-         
+         }(); //we are getting usages of variable/types/functions by using cScope
          
          int curp = start(node);
          repb(child, node)   
-             bool isInsertingDeclarationForScope = scope.isInserting;
+             bool isInsertingDeclarationForScope = cScope.isInserting;
              bool isInsertingDeclarationForVariable = forced_display_variable_insertion;
-             scope.isInserting = false;
+             cScope.isInserting = false;
              forced_display_variable_insertion = false;  
              addp(substring(cScope, curp, start(child)));
              parse(child, cScope, retVal);
              adds(retVal);
              curp = end(child);
-             scope.isInserting = isInsertingDeclarationForScope;
+             cScope.isInserting = isInsertingDeclarationForScope;
             forced_display_variable_insertion = isInsertingDeclarationForVariable;
          repe
          if(curp != end(node)) addp( substring(cScope, curp, end(node)) );
          dt->usages = cScope.vUsage;
          if(!is_type(ts_node_parent(node), "template_declaration")){
-            retVal.dt  = dt;//addDeclaration(dt, scope, true);
+            retVal.dt  = addDeclaration(dt, scope, true);
          }
          else{
              posl(retVal);
@@ -1209,17 +1224,40 @@ public:
     }
     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
          prel_typed(node, retVal, class_specifier_data_type);
+         Scope nScope(&scope);
+        scope.passdown(nScope);
+
+        Scope & cScope = [&](){
+                if(!is_type(ts_node_parent(node), "template_declaration")){
+                    return nScope; 
+                }else{
+                    return  scope;
+                }
+        }();
+
          int curp = start(node);
          repb(child, node)   
-             addp(substring(scope, curp, start(child)));
-             parse(child, scope, retVal);
-             adds(retVal);
-             curp = end(child);
+            bool isInsertingDeclarationForScope = cScope.isInserting;
+            bool isInsertingDeclarationForVariable = forced_display_variable_insertion;
+            cScope.isInserting = false;
+            forced_display_variable_insertion = false;
+            addp(substring(cScope, curp, start(child)));
+            parse(child, cScope, retVal);
+            adds(retVal);
+            curp = end(child);
+            cScope.isInserting = isInsertingDeclarationForScope;
+            forced_display_variable_insertion = isInsertingDeclarationForVariable;
          repe
          if(curp != end(node)){
-             addp( substring(scope, curp, end(node)) );
+             addp( substring(cScope, curp, end(node)) );
          }
-         posl(retVal);
+        dt->usages = cScope.vUsage;
+        if(!is_type(ts_node_parent(node), "template_declaration")){
+            retVal.dt  = addDeclaration(dt, scope, false);
+        }
+        else{
+            posl(retVal);
+        }
      }
 }class_specifier_handler;
 
@@ -1335,6 +1373,52 @@ public:
      }
 }declaration_handler;
 
+class alias_declaration : public statement_handler{
+public:
+    alias_declaration(){
+        this->registerHandler(getAllTypes());
+    }
+    vs getAllTypes() override{
+        return { "alias_declaration", "namespace_definition" };
+    }
+    void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
+         prel_typed(node, retVal, alias_declaration_data_type);
+         Scope nScope(&scope);
+         scope.passdown(nScope);
+
+         Scope & cScope = [&](){
+                if(!is_type(ts_node_parent(node), "template_declaration")){
+                    return nScope; 
+                }else{
+                    return  scope;
+                }
+         }(); 
+         
+         int curp = start(node);
+         repb(child, node)   
+             bool isInsertingDeclarationForScope = cScope.isInserting;
+             bool isInsertingDeclarationForVariable = forced_display_variable_insertion;
+             cScope.isInserting = false;
+             forced_display_variable_insertion = false;
+             addp(substring(cScope, curp, start(child)));
+             parse(child, cScope, retVal);
+             adds(retVal);
+             curp = end(child);
+             cScope.isInserting = isInsertingDeclarationForScope;
+            forced_display_variable_insertion = isInsertingDeclarationForVariable;
+         repe
+         if(curp != end(node)){
+             addp( substring(cScope, curp, end(node)) );
+         }
+         dt->usages = cScope.vUsage;
+          if(!is_type(ts_node_parent(node), "template_declaration")){
+            retVal.dt  = addDeclaration(dt, scope, false);
+         }
+         else{
+             posl(retVal);
+         }
+     }
+}alias_declaration_handler;
 
 void parse(TSNode & node, Scope & scope, ReturnValue & retval){
     prel(node, retval);
