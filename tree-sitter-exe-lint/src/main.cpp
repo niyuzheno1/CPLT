@@ -42,7 +42,6 @@ dt->isSequential = true;\
 \
 \
 
-
 #define addpp(s, x, y) if(true){ data_type* nndt = data_type::newInstance();\
 nndt->content =  x;\
 nndt->type = y;\
@@ -193,7 +192,6 @@ namespace tree_sitter_declaration_space {
         }
     };  
 
-
     class class_specifier_data_type : public data_type{
         public:
             class_specifier_data_type(){
@@ -217,7 +215,6 @@ namespace tree_sitter_declaration_space {
                 return "";
             }
     };
-
    
     class function_declarator_data_type : public data_type{
     public:
@@ -293,8 +290,6 @@ namespace tree_sitter_declaration_space {
 };
 
 using namespace tree_sitter_declaration_space;
-
-
 
 namespace tree_sitter_util {
     str to_string(stringstream & x){
@@ -400,8 +395,6 @@ namespace tree_sitter_data_structures {
             return ts_tree_root_node(tree);
         }
     };
-    
-    
     
     class ReturnValue{
     public:
