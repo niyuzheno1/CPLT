@@ -146,7 +146,7 @@ namespace tree_sitter_declaration_space {
             return s[idx];
         }
     };
-    using vpdtpdt = vector<pair<data_type*, data_type*>>;
+    using vpdtpdt = vector<pair<data_type*, data_type*>>; // store the usage of other functions/variables/types etc. 
 
     class function_definition_data_type : public data_type{
     public:
@@ -341,12 +341,17 @@ namespace tree_sitter_data_structures {
     public:
         bool isInserting = false;
         MVD vvd;
+        MVD types; 
         vpdtpdt vUsage; 
         void add_function(str name, int args, data_type * dt, data_type * dt2){
             vvd[{name, args}].pb(mp(dt, dt2));
         }
         void add_variable(str name, data_type * dt, data_type * dt2){
             vvd[{name, -1}].pb(mp(dt, dt2));
+        }
+        // include classes and aliases and structs and unions and enums and typedefs
+        void add_type(str name, data_type * dt, data_type * dt2){
+            types[{name, -1}].pb(mp(dt, dt2));
         }
         Scope * parent;
         Scope(Scope * parent){
@@ -639,30 +644,6 @@ public:
             return dt;
     }
 };
-// template for statement handler
-// class x_statement : public statement_handler{
-// public:
-//     x_statement(){
-//         this->registerHandler(getAllTypes());
-//     }
-//     vs getAllTypes() override{
-//         return {};
-//     }
-//     void handle(TSNode & node, Scope & scope, ReturnValue & retVal, const_parse_proc_ref parse) {
-//          prel(node, retVal);
-//          int curp = start(node);
-//          repb(child, node)   
-//              addp(substring(scope, curp, start(child)));
-//              parse(child, scope, retVal);
-//              adds(retVal);
-//              curp = end(child);
-//          repe
-//          if(curp != end(node)){
-//              addp( substring(scope, curp, end(node)) );
-//          }
-//          posl(retVal);
-//      }
-// }x_statement_handler;
 
 class compound_statement : public statement_handler{
 public:
@@ -1250,7 +1231,6 @@ public:
      }
 }comment_statement_handler;
 
-
 class class_specifier : public statement_handler{
 public:
     class_specifier(){
@@ -1274,7 +1254,6 @@ public:
          posl(retVal);
      }
 }class_specifier_handler;
-
 
 class declaration : public statement_handler{
 public:
@@ -1410,10 +1389,6 @@ void parse(TSNode & node, Scope & scope, ReturnValue & retval){
     }
     posl(retval);
 }
-
-
-
-
 
 int main(){
     str buffer, bf;
